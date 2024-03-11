@@ -1,0 +1,32 @@
+name: Type hinter
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - 'main'
+  push:
+    paths:
+      - '*.py'
+
+
+jobs:
+  mypy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.11
+
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Upgrade pip
+        run: pip install --upgrade pip
+
+      - name: Install mypy
+        run: pip install -r requirements.txt
+        
+      - name: Run mypy
+        run: MYPYPATH=src mypy --explicit-package-bases --strict $(git ls-files '*.py')
