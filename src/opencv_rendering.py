@@ -7,7 +7,7 @@ import numpy as np
 
 class SoccerNetGS:
     def __init__(self):
-        self.data_directory = "./data/SoccerNetGS/gamestate-2024/"
+        self.data_directory = "./src/data/SoccerNetGS/gamestate-2024/"
         self.radar_path = "./sn-gamestate/sn_gamestate/visualization/Radar.png"
         self.palette = { # RGB values
             'Big rect. left bottom': (127, 0, 0),

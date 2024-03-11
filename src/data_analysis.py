@@ -1,6 +1,6 @@
 import os
 
-directories_path = './data/SoccerNetGS/gamestate-2024/'
+directories_path = './src/data/SoccerNetGS/gamestate-2024/'
 data_directories = ["challenge", "test", "train", "valid"]
 
 # Print the number of folders and files in every subdirectory of the data directory
