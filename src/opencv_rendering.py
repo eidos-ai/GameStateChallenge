@@ -4,10 +4,11 @@ import random
 import os
 import argparse
 import numpy as np
+from typing import Any
 
 
 class SoccerNetGS:
-    def __init__(self):
+    def __init__(self) -> None:
         self.data_directory = "./src/data/SoccerNetGS/gamestate-2024/"
         self.radar_path = "./src/sn-gamestate/sn_gamestate/visualization/Radar.png"
         self.palette = {  # RGB values
@@ -42,7 +43,7 @@ class SoccerNetGS:
             "Small rect. right top": (153, 23, 153),
         }
 
-    def find_video_path(self, video_number):
+    def find_video_path(self, video_number: str) -> tuple[str, str, str]:
 
         video_directory = "SNGS-" + str(video_number).zfill(3)
 
@@ -73,7 +74,9 @@ class SoccerNetGS:
 
         return video_path, random_frame, frame_path
 
-    def get_object_annotations(self, video_path, random_frame):
+    def get_object_annotations(
+        self, video_path: str, random_frame: str
+    ) -> list[dict[str, Any]]:
         object_annotations = []
         object_categories = ["player", "goalkeeper", "referee"]
 
@@ -91,7 +94,11 @@ class SoccerNetGS:
 
         return object_annotations
 
-    def get_pitch_annotation(self, video_path, random_frame):
+    def get_pitch_annotation(
+        self, video_path: str, random_frame: str
+    ) -> dict[str, Any]:
+
+        pitch_annotation = dict()
 
         with open(video_path + "/Labels-GameState.json", "r") as file:
             data = json.load(file)
@@ -101,11 +108,17 @@ class SoccerNetGS:
                         annotation["image_id"][-6:] == random_frame
                         and annotation["supercategory"] == "pitch"
                     ):
-                        return annotation
+                        pitch_annotation = annotation
                 except:
                     pass
+        return pitch_annotation
 
-    def render_frame(self, frame_path, object_annotations, pitch_annotation):
+    def render_frame(
+        self,
+        frame_path: str,
+        object_annotations: list[Any],
+        pitch_annotation: dict[str, Any],
+    ) -> None:
         frame = cv.imread(frame_path)
         minimap = cv.imread(self.radar_path)
 

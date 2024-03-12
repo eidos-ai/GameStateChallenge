@@ -1,11 +1,12 @@
 import os
+from typing import Any
 
-directories_path = "./src/data/SoccerNetGS/gamestate-2024/"
+directories_path = "./data/SoccerNetGS/gamestate-2024/"
 data_directories = ["challenge", "test", "train", "valid"]
 
 
 # Print the number of folders and files in every subdirectory of the data directory
-def count_folders_and_files(directory):
+def count_folders_and_files(directory: str) -> tuple[int, int, list[str]]:
     folders = 0
     files = 0
     filenames = []
@@ -17,7 +18,7 @@ def count_folders_and_files(directory):
         else:
             folders += 1
 
-    return folders, files, filenames
+    return (folders, files, filenames)
 
 
 # Check if sequences_info.json files in different directories are the same
@@ -26,7 +27,7 @@ import json
 sequences_files_data = []
 
 
-def check_duplicated_sequence_files():
+def check_duplicated_sequence_files() -> Any:
     file_name = "/sequences_info.json"
 
     for directory in data_directories:
@@ -44,7 +45,7 @@ def check_duplicated_sequence_files():
 
 
 # In Labels-GameState.json, print every annotation of supercategory "camera" where the image of that annotation has "has_enabled_camera" as False
-def print_camera_annotations():
+def print_camera_annotations() -> None:
     labels_file_path = os.path.join(
         directories_path, "test/SNGS-116/Labels-GameState.json"
     )
@@ -60,7 +61,7 @@ def print_camera_annotations():
                         print(json.dumps(annotation, indent=4))
 
 
-def check_goalkeeper_jersey():
+def check_goalkeeper_jersey() -> None:
     labels_file_path = os.path.join(
         directories_path, "test/SNGS-116/Labels-GameState.json"
     )
