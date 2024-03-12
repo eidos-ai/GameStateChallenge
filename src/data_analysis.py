@@ -1,8 +1,9 @@
 import os
 from typing import Any
+import json
 
-directories_path = "./data/SoccerNetGS/gamestate-2024/"
-data_directories = ["challenge", "test", "train", "valid"]
+DIRECTORIES_PATH = "./data/SoccerNetGS/gamestate-2024/"
+DATA_DIRECTORIES = ["challenge", "test", "train", "valid"]
 
 
 # Print the number of folders and files in every subdirectory of the data directory
@@ -22,16 +23,12 @@ def count_folders_and_files(directory: str) -> tuple[int, int, list[str]]:
 
 
 # Check if sequences_info.json files in different directories are the same
-import json
-
-sequences_files_data = []
-
-
 def check_duplicated_sequence_files() -> Any:
     file_name = "/sequences_info.json"
+    sequences_files_data = []
 
-    for directory in data_directories:
-        file_path = os.path.join(directories_path, directory + file_name)
+    for directory in DATA_DIRECTORIES:
+        file_path = os.path.join(DIRECTORIES_PATH, directory + file_name)
         with open(file_path, "r") as file:
             data = json.load(file)
             sequences_files_data.append(data)
@@ -47,7 +44,7 @@ def check_duplicated_sequence_files() -> Any:
 # In Labels-GameState.json, print every annotation of supercategory "camera" where the image of that annotation has "has_enabled_camera" as False
 def print_camera_annotations() -> None:
     labels_file_path = os.path.join(
-        directories_path, "test/SNGS-116/Labels-GameState.json"
+        DIRECTORIES_PATH, "test/SNGS-116/Labels-GameState.json"
     )
     with open(labels_file_path, "r") as file:
         data = json.load(file)
@@ -63,7 +60,7 @@ def print_camera_annotations() -> None:
 
 def check_goalkeeper_jersey() -> None:
     labels_file_path = os.path.join(
-        directories_path, "test/SNGS-116/Labels-GameState.json"
+        DIRECTORIES_PATH, "test/SNGS-116/Labels-GameState.json"
     )
     goalkeeper_with_jersey = False
     with open(labels_file_path, "r") as file:
@@ -87,15 +84,19 @@ def check_goalkeeper_jersey() -> None:
 
 if __name__ == "__main__":
 
-    # for directory in data_directories:
-    #     path = os.path.join(directories_path, directory)
-    #     folder_count, file_count, file_name = count_folders_and_files(path)
-    #     print(f"Directory: {directory}")
-    #     print(f"Number of folders: {folder_count}")
-    #     print(f"Number of files: {file_count}")
-    #     print(f"Names of those files: {file_name} \n")
+    for directory in DATA_DIRECTORIES:
+        path = os.path.join(DIRECTORIES_PATH, directory)
+        folder_count, file_count, file_name = count_folders_and_files(path)
+        print(f"Directory: {directory}")
+        print(f"Number of folders: {folder_count}")
+        print(f"Number of files: {file_count}")
+        print(f"Names of those files: {file_name} \n")
 
-    # print("Sequences files are the same.\n") if check_duplicated_sequence_files() else print("Sequences files are different.\n")
+    (
+        print("Sequences files are the same.\n")
+        if check_duplicated_sequence_files()
+        else print("Sequences files are different.\n")
+    )
 
     print_camera_annotations()
     check_goalkeeper_jersey()

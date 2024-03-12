@@ -8,9 +8,11 @@ from typing import Any
 
 
 class SoccerNetGS:
+
+    DATA_DIRECTORY = "./src/data/SoccerNetGS/gamestate-2024/"
+    RADAR_PATH = "./src/sn-gamestate/sn_gamestate/visualization/Radar.png"
+
     def __init__(self) -> None:
-        self.data_directory = "./src/data/SoccerNetGS/gamestate-2024/"
-        self.radar_path = "./src/sn-gamestate/sn_gamestate/visualization/Radar.png"
         self.palette = {  # RGB values
             "Big rect. left bottom": (127, 0, 0),
             "Big rect. left main": (102, 102, 102),
@@ -47,7 +49,7 @@ class SoccerNetGS:
 
         video_directory = "SNGS-" + str(video_number).zfill(3)
 
-        for root, dirs, files in os.walk(self.data_directory):
+        for root, dirs, files in os.walk(self.DATA_DIRECTORY):
             if video_directory in dirs:
                 if "challenge" not in str(os.path.join(root, video_directory)):
                     print(os.path.join(root, video_directory))
@@ -120,7 +122,7 @@ class SoccerNetGS:
         pitch_annotation: dict[str, Any],
     ) -> None:
         frame = cv.imread(frame_path)
-        minimap = cv.imread(self.radar_path)
+        minimap = cv.imread(self.RADAR_PATH)
 
         # pitch lines rendering
         for line in pitch_annotation["lines"]:
