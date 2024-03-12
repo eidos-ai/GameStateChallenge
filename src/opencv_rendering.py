@@ -1,9 +1,9 @@
-import cv2 as cv
+import cv2 as cv  # type: ignore
 import json
 import random
 import os
 import argparse
-import numpy as np
+import numpy as np  # type: ignore
 from typing import Any
 
 
