@@ -3,6 +3,10 @@ env
 
 .DS_Store
 .ipynb_checkpoints
+.mypy_cache
 
 # Data folder
-data
+data/
+
+# Python cache folder
+__pycache__/
