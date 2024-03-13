@@ -1,5 +1,5 @@
-'''Module to render a random frame from a SoccerNetGS
-video with object annotations and pitch lines.'''
+"""Module to render a random frame from a SoccerNetGS
+video with object annotations and pitch lines."""
 from typing import Any
 import json
 import random
@@ -10,8 +10,9 @@ import cv2 as cv # type: ignore
 import numpy as np # type: ignore
 
 class SoccerNetGS:
-    '''Class to render a random frame from a SoccerNetGS
-        video with object annotations and pitch lines.'''
+    """Class to render a random frame from a SoccerNetGS
+        video with object annotations and pitch lines."""
+    
     DATA_DIRECTORY = "./src/data/SoccerNetGS/gamestate-2024/"
     RADAR_PATH = "./src/sn-gamestate/sn_gamestate/visualization/Radar.png"
 
@@ -49,7 +50,7 @@ class SoccerNetGS:
         }
 
     def find_video_path(self, video_number: str) -> tuple[str, str, str]:
-        '''Find the path of the video and the frame to be displayed.'''
+        """Find the path of the video and the frame to be displayed."""
         video_directory = "SNGS-" + str(video_number).zfill(3)
         video_path = ""
         for root, dirs, _ in os.walk(self.DATA_DIRECTORY):
@@ -74,7 +75,7 @@ class SoccerNetGS:
         return video_path, random_frame, frame_path
 
     def get_object_annotations(self, video_path: str, random_frame: str) -> list[dict[str, Any]]:
-        '''Find the object annotations for the random frame.'''
+        """Find the object annotations for the random frame."""
         object_annotations = []
         object_categories = ["player", "goalkeeper", "referee"]
 
@@ -91,7 +92,7 @@ class SoccerNetGS:
         return object_annotations
 
     def get_pitch_annotation(self, video_path: str, random_frame: str) -> dict[str, Any]:
-        '''Find the pitch annotations for the random frame.'''
+        """Find the pitch annotations for the random frame."""
         pitch_annotation = {}
         with open(video_path + "/Labels-GameState.json", "r", encoding="utf-8") as file:
             data = json.load(file)
@@ -106,7 +107,7 @@ class SoccerNetGS:
 
     def render_frame(self, frame_path: str, object_annotations:
                      list[Any], pitch_annotation: dict[str, Any]) -> None:
-        '''Render the frame with the objects labelling and pitch lines.'''
+        """Render the frame with the objects labelling and pitch lines."""
         frame = cv.imread(frame_path)
         minimap = cv.imread(self.RADAR_PATH)
 
