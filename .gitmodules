@@ -1,6 +1,8 @@
 [submodule "src/sn-gamestate"]
 	path = src/sn-gamestate
 	url = https://github.com/SoccerNet/sn-gamestate.git
+	branch = main
 [submodule "src/tracklab"]
 	path = src/tracklab
 	url = https://github.com/TrackingLaboratory/tracklab.git
+	branch = main
