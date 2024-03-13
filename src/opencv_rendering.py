@@ -6,8 +6,8 @@ import random
 import os
 import sys
 import argparse
-import cv2 as cv
-import numpy as np
+import cv2 as cv # type: ignore
+import numpy as np # type: ignore
 
 class SoccerNetGS:
     '''Class to render a random frame from a SoccerNetGS
