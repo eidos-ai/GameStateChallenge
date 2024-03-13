@@ -1,14 +1,17 @@
-import cv2 as cv  # type: ignore
+'''Module to render a random frame from a SoccerNetGS
+video with object annotations and pitch lines.'''
+from typing import Any
 import json
 import random
 import os
+import sys
 import argparse
-import numpy as np  # type: ignore
-from typing import Any
-
+import cv2 as cv
+import numpy as np
 
 class SoccerNetGS:
-
+    '''Class to render a random frame from a SoccerNetGS
+        video with object annotations and pitch lines.'''
     DATA_DIRECTORY = "./src/data/SoccerNetGS/gamestate-2024/"
     RADAR_PATH = "./src/sn-gamestate/sn_gamestate/visualization/Radar.png"
 
@@ -46,81 +49,64 @@ class SoccerNetGS:
         }
 
     def find_video_path(self, video_number: str) -> tuple[str, str, str]:
-
+        '''Find the path of the video and the frame to be displayed.'''
         video_directory = "SNGS-" + str(video_number).zfill(3)
-
-        for root, dirs, files in os.walk(self.DATA_DIRECTORY):
+        video_path = ""
+        for root, dirs, _ in os.walk(self.DATA_DIRECTORY):
             if video_directory in dirs:
                 if "challenge" not in str(os.path.join(root, video_directory)):
-                    print(os.path.join(root, video_directory))
                     video_path = os.path.join(root, video_directory)
                 else:
-                    print(f"Video {video_directory} is a challenge video. Skipping.")
-                    exit()
-
-        try:
-            frame_directory = video_path + "/img1/"
-        except:
+                    print(
+                        f"Video {video_directory} is a challenge video. Try another video number."
+                        )
+                    sys.exit()
+        if video_path == "":
             print(f"Video {video_directory} not found.")
-            exit()
-
-        random_frame = str(random.randint(0, 750)).zfill(
-            6
-        )  # 3 digit integer number of the frame
-        frame_name = (
-            str(random_frame).zfill(6) + ".jpg"
-        )  # filled 6 digit frame file name
+            sys.exit()
+        else:
+            frame_directory = video_path + "/img1/"
+        random_frame = str(random.randint(0, 750)).zfill(6)  # 3 digit integer number of the frame
+        frame_name = str(random_frame).zfill(6) + ".jpg"  # filled 6 digit frame file name
         frame_path = frame_directory + frame_name
 
         print(f"The frame {frame_name} from video {video_directory} will be displayed.")
-
         return video_path, random_frame, frame_path
 
-    def get_object_annotations(
-        self, video_path: str, random_frame: str
-    ) -> list[dict[str, Any]]:
+    def get_object_annotations(self, video_path: str, random_frame: str) -> list[dict[str, Any]]:
+        '''Find the object annotations for the random frame.'''
         object_annotations = []
         object_categories = ["player", "goalkeeper", "referee"]
 
-        with open(video_path + "/Labels-GameState.json", "r") as file:
+        with open(video_path + "/Labels-GameState.json", "r", encoding="utf-8") as file:
             data = json.load(file)
             for annotation in data["annotations"]:
                 try:
-                    if (
-                        annotation["image_id"][-6:] == random_frame
-                        and annotation["attributes"]["role"] in object_categories
-                    ):
+                    if (annotation["image_id"][-6:] == random_frame
+                        and annotation["attributes"]["role"] in object_categories):
                         object_annotations.append(annotation)
-                except:
+                except KeyError:
                     pass
 
         return object_annotations
 
-    def get_pitch_annotation(
-        self, video_path: str, random_frame: str
-    ) -> dict[str, Any]:
-
-        pitch_annotation = dict()
-
-        with open(video_path + "/Labels-GameState.json", "r") as file:
+    def get_pitch_annotation(self, video_path: str, random_frame: str) -> dict[str, Any]:
+        '''Find the pitch annotations for the random frame.'''
+        pitch_annotation = {}
+        with open(video_path + "/Labels-GameState.json", "r", encoding="utf-8") as file:
             data = json.load(file)
             for annotation in data["annotations"]:
                 try:
-                    if (
-                        annotation["image_id"][-6:] == random_frame
-                        and annotation["supercategory"] == "pitch"
-                    ):
+                    if (annotation["image_id"][-6:] == random_frame
+                        and annotation["supercategory"] == "pitch"):
                         pitch_annotation = annotation
-                except:
+                except KeyError:
                     pass
         return pitch_annotation
 
-    def render_frame(
-        self,
-        frame_path: str,
-        object_annotations: list[Any],
-        pitch_annotation: dict[str, Any],
-    ) -> None:
+    def render_frame(self, frame_path: str, object_annotations:
+                     list[Any], pitch_annotation: dict[str, Any]) -> None:
+        '''Render the frame with the objects labelling and pitch lines.'''
         frame = cv.imread(frame_path)
         minimap = cv.imread(self.RADAR_PATH)
 
@@ -134,99 +120,71 @@ class SoccerNetGS:
             cv.drawContours(frame, [ctr], -1, self.palette[line], 2)
 
         # object (players, goalkeepers, referees) rendering
-        for object in object_annotations:
-
+        for item in object_annotations:
             # object box
-            starting_point_object = (
-                (int(object["bbox_image"]["x"])),
-                int(object["bbox_image"]["y"]),
-            )
-            ending_point_object = (
-                int(object["bbox_image"]["x"]) + int(object["bbox_image"]["w"]),
-                int(object["bbox_image"]["y"]) + int(object["bbox_image"]["h"]),
-            )
+            starting_point_object = ((int(item["bbox_image"]["x"])),
+                                      int(item["bbox_image"]["y"]))
+            ending_point_object = (int(item["bbox_image"]["x"]) + int(item["bbox_image"]["w"]),
+                                    int(item["bbox_image"]["y"]) + int(item["bbox_image"]["h"]))
 
             # color box depending on team
-            if (
-                object["attributes"]["role"] == "player"
-                or object["attributes"]["role"] == "goalkeeper"
-            ):
-                if object["attributes"]["team"] == "left":
+            if (item["attributes"]["role"] == "player"
+                or item["attributes"]["role"] == "goalkeeper"):
+                if item["attributes"]["team"] == "left":
                     color = (0, 0, 255)  # Red according to opencv
                 else:
                     color = (255, 0, 0)  # Blue according to opencv
 
                 # jersey box
-                starting_point_jersey = (
-                    starting_point_object[0] - 15,
-                    ending_point_object[1],
-                )
-                ending_point_jersey = (
-                    ending_point_object[0] + 15,
-                    starting_point_jersey[1] + 25,
-                )
-                cv.rectangle(
-                    frame, starting_point_jersey, ending_point_jersey, color, -1
-                )
+                starting_point_jersey = (starting_point_object[0] - 15, ending_point_object[1])
+                ending_point_jersey = (ending_point_object[0] + 15, starting_point_jersey[1] + 25)
+                cv.rectangle(frame, starting_point_jersey, ending_point_jersey, color, -1)
 
                 # jersey text
                 jersey_text = "JN: "
-                if object["attributes"]["jersey"] != None:
-                    jersey_text += object["attributes"]["jersey"]
+                if item["attributes"]["jersey"] is not None:
+                    jersey_text += item["attributes"]["jersey"]
                 else:
                     jersey_text += "-"
                 cv.putText(
-                    frame,
-                    jersey_text,
-                    (starting_point_jersey[0] + 5, starting_point_jersey[1] + 15),
-                    cv.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (255, 255, 255),
-                    1,
-                    cv.LINE_AA,
-                )
+                    frame, jersey_text, (starting_point_jersey[0] + 5,
+                                          starting_point_jersey[1] + 15),
+                            cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv.LINE_AA)
 
                 # player on minimap
-                starting_point_minimap = (
-                    (int(object["bbox_pitch"]["x_bottom_middle"])) + 61,
-                    (int(object["bbox_pitch"]["y_bottom_middle"])) + 37,
-                )
-                ending_point_minimap = (
-                    (int(object["bbox_pitch"]["x_bottom_middle"])) + 63,
-                    (int(object["bbox_pitch"]["y_bottom_middle"])) + 39,
-                )
-                cv.rectangle(
-                    minimap, starting_point_minimap, ending_point_minimap, color, -1
-                )
-                resized_minimap = cv.resize(
-                    minimap,
-                    (int(minimap.shape[1] * 3), int(minimap.shape[0] * 3)),
-                    interpolation=cv.INTER_AREA,
-                )
+                try:
+                    starting_point_minimap = ((int(item["bbox_pitch"]["x_bottom_middle"])) + 61,
+                                            (int(item["bbox_pitch"]["y_bottom_middle"])) + 37)
+                    ending_point_minimap = ((int(item["bbox_pitch"]["x_bottom_middle"])) + 63,
+                                            (int(item["bbox_pitch"]["y_bottom_middle"])) + 39)
+                    cv.rectangle(minimap, starting_point_minimap, ending_point_minimap, color, -1)
+                    resized_minimap = cv.resize( minimap, (int(minimap.shape[1] * 3),
+                                                            int(minimap.shape[0] * 3)),
+                        interpolation=cv.INTER_AREA
+                        )
+                except TypeError:
+                    print("No minimap coordinates for this object.")
 
-            elif object["attributes"]["role"] == "referee":
+            elif item["attributes"]["role"] == "referee":
                 color = (30, 255, 255)
 
             thickness = 2  # Line thickness of 2 px
-            cv.rectangle(
-                frame, starting_point_object, ending_point_object, color, thickness
-            )
+            cv.rectangle(frame, starting_point_object, ending_point_object, color, thickness)
 
         frame[
             800 : resized_minimap.shape[0] + 800, 750 : resized_minimap.shape[1] + 750
-        ] = resized_minimap
+            ] = resized_minimap
         cv.imshow("Random frame", frame)
         cv.waitKey(0)  # Wait for a keystroke in the window
-
 
 if __name__ == "__main__":
     sn = SoccerNetGS()
     parser = argparse.ArgumentParser(description="")
     parser.add_argument(
         "-v", "--video_number", type=int, required=True, help="Choose video number."
-    )
+        )
     args = parser.parse_args()
-    video_path, random_frame, frame_path = sn.find_video_path(args.video_number)
-    object_annotations = sn.get_object_annotations(video_path, random_frame)
-    pitch_annotation = sn.get_pitch_annotation(video_path, random_frame)
-    sn.render_frame(frame_path, object_annotations, pitch_annotation)
+    path_video, frame_random, path_frame = sn.find_video_path(args.video_number)
+    annotations_objects = sn.get_object_annotations(path_video, frame_random)
+    annotation_pitch = sn.get_pitch_annotation(path_video, frame_random)
+    sn.render_frame(path_frame, annotations_objects, annotation_pitch)
