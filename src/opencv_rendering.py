@@ -9,14 +9,15 @@ import sys
 import argparse
 import cv2 as cv  # type: ignore
 import numpy as np  # type: ignore
+import matplotlib.pyplot as plt
 
 
 class SoccerNetGS:
     """Class to render a random frame from a SoccerNetGS
     video with object annotations and pitch lines."""
 
-    DATA_DIRECTORY = "./src/data/SoccerNetGS/gamestate-2024/"
-    RADAR_PATH = "./src/sn-gamestate/sn_gamestate/visualization/Radar.png"
+    DATA_DIRECTORY = "./data/SoccerNetGS/gamestate-2024/"
+    RADAR_PATH = "./sn-gamestate/sn_gamestate/visualization/Radar.png"
 
     def __init__(self) -> None:
         self.palette = {  # RGB values
@@ -214,8 +215,7 @@ class SoccerNetGS:
                         interpolation=cv.INTER_AREA,
                     )
                 except TypeError:
-                    print("No minimap coordinates for this object.")
-                    break
+                    continue
         frame[
             800 : resized_minimap.shape[0] + 800, 750 : resized_minimap.shape[1] + 750
         ] = resized_minimap
@@ -251,8 +251,9 @@ class SoccerNetGS:
             frame = self.render_objects(frame, object_annotations)
         if minimap_render:
             frame = self.render_minimap(frame, object_annotations)
-        cv.imshow("Random frame", frame)
-        cv.waitKey(0)
+        frame_rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+        plt.imshow(frame_rgb)
+        plt.show()
 
 
 if __name__ == "__main__":
