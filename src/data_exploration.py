@@ -1,0 +1,116 @@
+"""This script is used to analyze data in the SoccerNetGS dataset."""
+
+from typing import Any
+import os
+import json
+
+DIRECTORIES_PATH = "./data/SoccerNetGS/gamestate-2024/"
+DATA_DIRECTORIES = ["challenge", "test", "train", "valid"]
+
+
+def count_folders_and_files(in_directory: str) -> tuple[int, int, list[str]]:
+    """Print the number of folders and files in every subdirectory of the data directory."""
+    folders = 0
+    files = 0
+    filenames = []
+
+    for name in os.listdir(in_directory):
+        if os.path.isfile(os.path.join(in_directory, name)) and name != ".DS_Store":
+            files += 1
+            filenames.append(name)
+        else:
+            folders += 1
+
+    return (folders, files, filenames)
+
+
+def check_duplicated_sequence_files() -> Any:
+    """Check if sequences_info.json files in different directories are the same."""
+    file_name = "/sequences_info.json"
+    sequences_files_data = []
+
+    for directory in DATA_DIRECTORIES:
+        file_path = os.path.join(DIRECTORIES_PATH, directory + file_name)
+        with open(file_path, "r", encoding="utf8") as file:
+            data = json.load(file)
+            sequences_files_data.append(data)
+
+    return (
+        sequences_files_data[0]
+        == sequences_files_data[1]
+        == sequences_files_data[2]
+        == sequences_files_data[3]
+    )
+
+
+def print_camera_annotations() -> None:
+    """In Labels-GameState.json, print every annotation of supercategory "camera"
+    where the image of that annotation has "has_enabled_camera" as False"""
+    labels_file_path = os.path.join(
+        DIRECTORIES_PATH, "test/SNGS-116/Labels-GameState.json"
+    )
+    with open(labels_file_path, "r", encoding="utf8") as file:
+        data = json.load(file)
+        for image in data["images"]:
+            if image["has_labeled_camera"] is False:
+                for annotation in data["annotations"]:
+                    if (
+                        annotation["image_id"] == image["image_id"]
+                        and annotation["supercategory"] == "camera"
+                    ):
+                        print(json.dumps(annotation, indent=4))
+
+
+def check_goalkeeper_jersey() -> None:
+    """In Labels-GameState.json, check if there is any goalkeeper with a jersey number."""
+    labels_file_path = os.path.join(
+        DIRECTORIES_PATH, "test/SNGS-116/Labels-GameState.json"
+    )
+    goalkeeper_with_jersey = False
+    with open(labels_file_path, "r", encoding="utf8") as file:
+        data = json.load(file)
+        for annotation in data["annotations"]:
+            try:
+                if (
+                    annotation["attributes"]["role"] == "goalkeeper"
+                    and annotation["attributes"]["jersey"] is not None
+                ):
+                    goalkeeper_with_jersey = True
+                    break
+            except KeyError:
+                pass
+    (
+        print("Some goalkeepers have jersey number.")
+        if goalkeeper_with_jersey
+        else print("No goalkeeper has jersey number.")
+    )
+
+
+def show_random_pitch_annotation() -> None:
+    """Show a random pitch annotation."""
+    labels_file_path = os.path.join(
+        DIRECTORIES_PATH, "test/SNGS-116/Labels-GameState.json"
+    )
+    with open(labels_file_path, "r", encoding="utf8") as file:
+        data = json.load(file)
+        for annotation in data["annotations"]:
+            if annotation["supercategory"] == "pitch":
+                print(json.dumps(annotation, indent=4))
+                break
+
+
+if __name__ == "__main__":
+    for folder in DATA_DIRECTORIES:
+        path = os.path.join(DIRECTORIES_PATH, folder)
+        folder_count, file_count, name_file = count_folders_and_files(path)
+        print(f"Directory: {folder}")
+        print(f"Number of folders: {folder_count}")
+        print(f"Number of files: {file_count}")
+        print(f"Names of those files: {name_file} \n")
+    (
+        print("Sequences files are the same.\n")
+        if check_duplicated_sequence_files()
+        else print("Sequences files are different.\n")
+    )
+    print_camera_annotations()
+    check_goalkeeper_jersey()
