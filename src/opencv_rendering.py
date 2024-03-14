@@ -12,7 +12,7 @@ import numpy as np # type: ignore
 class SoccerNetGS:
     """Class to render a random frame from a SoccerNetGS
         video with object annotations and pitch lines."""
-    
+
     DATA_DIRECTORY = "./src/data/SoccerNetGS/gamestate-2024/"
     RADAR_PATH = "./src/sn-gamestate/sn_gamestate/visualization/Radar.png"
 
@@ -104,55 +104,49 @@ class SoccerNetGS:
                 except KeyError:
                     pass
         return pitch_annotation
-
-    def render_frame(self, frame_path: str, object_annotations:
-                     list[Any], pitch_annotation: dict[str, Any]) -> None:
-        """Render the frame with the objects labelling and pitch lines."""
-        frame = cv.imread(frame_path)
-        minimap = cv.imread(self.RADAR_PATH)
-
-        # pitch lines rendering
-        for line in pitch_annotation["lines"]:
-            points = np.array([])
-            for point in pitch_annotation["lines"][line]:
-                coords = (int(float(point["x"]) * 1920), int(float(point["y"]) * 1080))
-                points = np.append(points, coords, axis=0)
-            ctr = np.array(points).reshape((-1, 1, 2)).astype(np.int32)
-            cv.drawContours(frame, [ctr], -1, self.palette[line], 2)
-
-        # object (players, goalkeepers, referees) rendering
+    
+    def render_objects(self, frame: np.ndarray[Any, np.dtype[Any]], object_annotations: list[Any]) -> np.ndarray[Any, np.dtype[Any]]:
+        """Render the objects labelling."""
         for item in object_annotations:
-            # object box
-            starting_point_object = ((int(item["bbox_image"]["x"])),
-                                      int(item["bbox_image"]["y"]))
-            ending_point_object = (int(item["bbox_image"]["x"]) + int(item["bbox_image"]["w"]),
-                                    int(item["bbox_image"]["y"]) + int(item["bbox_image"]["h"]))
+            # object rectangle
+            starting_point_object = ((int(item["bbox_image"]["x"])), int(item["bbox_image"]["y"]))
+            ending_point_object = (int(item["bbox_image"]["x"]) + int(item["bbox_image"]["w"]), int(item["bbox_image"]["y"]) + int(item["bbox_image"]["h"]))
 
-            # color box depending on team
-            if (item["attributes"]["role"] == "player"
-                or item["attributes"]["role"] == "goalkeeper"):
+            # color rectangle depending on team (if player or goalkeeper)
+            if (item["attributes"]["role"] == "player" or item["attributes"]["role"] == "goalkeeper"):
                 if item["attributes"]["team"] == "left":
                     color = (0, 0, 255)  # Red according to opencv
                 else:
                     color = (255, 0, 0)  # Blue according to opencv
-
-                # jersey box
+                # jersey number rectangle
                 starting_point_jersey = (starting_point_object[0] - 15, ending_point_object[1])
                 ending_point_jersey = (ending_point_object[0] + 15, starting_point_jersey[1] + 25)
                 cv.rectangle(frame, starting_point_jersey, ending_point_jersey, color, -1)
-
-                # jersey text
+                # jersey number rectangle text
                 jersey_text = "JN: "
                 if item["attributes"]["jersey"] is not None:
                     jersey_text += item["attributes"]["jersey"]
                 else:
                     jersey_text += "-"
-                cv.putText(
-                    frame, jersey_text, (starting_point_jersey[0] + 5,
-                                          starting_point_jersey[1] + 15),
-                            cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv.LINE_AA)
+                cv.putText(frame, jersey_text, (starting_point_jersey[0] + 5, starting_point_jersey[1] + 15), cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv.LINE_AA)
 
-                # player on minimap
+            # color rectangle (if referee)
+            elif item["attributes"]["role"] == "referee":
+                color = (30, 255, 255)
+
+            thickness = 2  # Line thickness of 2px
+            cv.rectangle(frame, starting_point_object, ending_point_object, color, thickness)
+        return frame
+    
+    def render_minimap(self, frame: np.ndarray[Any, np.dtype[Any]], object_annotations: list[Any]) -> np.ndarray[Any, np.dtype[Any]]:
+        """Render the minimap."""
+        minimap = cv.imread(self.RADAR_PATH)
+        for item in object_annotations:
+            if (item["attributes"]["role"] == "player" or item["attributes"]["role"] == "goalkeeper"):
+                if item["attributes"]["team"] == "left":
+                    color = (0, 0, 255)  # Red according to opencv
+                else:
+                    color = (255, 0, 0)  # Blue according to opencv
                 try:
                     starting_point_minimap = ((int(item["bbox_pitch"]["x_bottom_middle"])) + 61,
                                             (int(item["bbox_pitch"]["y_bottom_middle"])) + 37)
@@ -165,27 +159,39 @@ class SoccerNetGS:
                         )
                 except TypeError:
                     print("No minimap coordinates for this object.")
-
-            elif item["attributes"]["role"] == "referee":
-                color = (30, 255, 255)
-
-            thickness = 2  # Line thickness of 2 px
-            cv.rectangle(frame, starting_point_object, ending_point_object, color, thickness)
-
-        frame[
-            800 : resized_minimap.shape[0] + 800, 750 : resized_minimap.shape[1] + 750
-            ] = resized_minimap
+                    break
+        frame[800 : resized_minimap.shape[0] + 800, 750 : resized_minimap.shape[1] + 750] = resized_minimap
+        return frame
+    
+    def render_pitch_lines(self, frame: np.ndarray[Any, np.dtype[Any]], pitch_annotation: dict[str, Any]) -> np.ndarray[Any, np.dtype[Any]]:
+        """Render the pitch lines."""
+        for line in pitch_annotation["lines"]:
+            points = np.array([])
+            for point in pitch_annotation["lines"][line]:
+                coords = (int(float(point["x"]) * 1920), int(float(point["y"]) * 1080))
+                points = np.append(points, coords, axis=0)
+            ctr = np.array(points).reshape((-1, 1, 2)).astype(np.int32)
+            cv.drawContours(frame, [ctr], -1, self.palette[line], 2)
+        return frame
+    
+    def show_image(self, frame_path: str, object_annotations: list[Any], pitch_annotation: dict[str, Any], objects_render: bool=True, minimap_render: bool=True, pitch_lines_render: bool=True) -> None:
+        """Show the image."""
+        frame = cv.imread(frame_path)
+        if pitch_lines_render:
+            frame = self.render_pitch_lines(frame, pitch_annotation)
+        if objects_render:
+            frame = self.render_objects(frame, object_annotations)
+        if minimap_render:
+            frame = self.render_minimap(frame, object_annotations)
         cv.imshow("Random frame", frame)
-        cv.waitKey(0)  # Wait for a keystroke in the window
+        cv.waitKey(0)
 
 if __name__ == "__main__":
     sn = SoccerNetGS()
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument(
-        "-v", "--video_number", type=int, required=True, help="Choose video number."
-        )
+    parser.add_argument("-v", "--video_number", type=int, required=True, help="Choose video number.")
     args = parser.parse_args()
     path_video, frame_random, path_frame = sn.find_video_path(args.video_number)
     annotations_objects = sn.get_object_annotations(path_video, frame_random)
     annotation_pitch = sn.get_pitch_annotation(path_video, frame_random)
-    sn.render_frame(path_frame, annotations_objects, annotation_pitch)
+    sn.show_image(path_frame, annotations_objects, annotation_pitch)
