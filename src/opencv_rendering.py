@@ -258,9 +258,7 @@ class SoccerNetGS:
 if __name__ == "__main__":
     sn = SoccerNetGS()
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument(
-        "-v", "--video_number", type=int, required=True, help="Choose video number."
-    )
+    parser.add_argument("-v", "--video_number", type=int, required=True, help="Choose video number.")
     args = parser.parse_args()
     path_video, frame_random, path_frame = sn.find_video_path(args.video_number)
     annotations_objects = sn.get_object_annotations(path_video, frame_random)
