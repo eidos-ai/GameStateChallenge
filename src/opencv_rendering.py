@@ -69,9 +69,7 @@ class SoccerNetGS:
             sys.exit()
         else:
             frame_directory = video_path + "/img1/"
-        random_frame = str(random.randint(0, 750)).zfill(
-            6
-        )  # 3 digit integer number of the frame
+        random_frame = str(random.randint(0, 750)).zfill(6)  # 3 digit integer number of the frame
         frame_name = (
             str(random_frame).zfill(6) + ".jpg"
         )  # filled 6 digit frame file name
