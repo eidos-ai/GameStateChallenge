@@ -70,6 +70,16 @@ def check_goalkeeper_jersey() -> None:
      if goalkeeper_with_jersey
      else print("No goalkeeper has jersey number."))
 
+def show_random_pitch_annotation() -> None:
+    """Show a random pitch annotation."""
+    labels_file_path = os.path.join(DIRECTORIES_PATH, "test/SNGS-116/Labels-GameState.json")
+    with open(labels_file_path, "r", encoding='utf8') as file:
+        data = json.load(file)
+        for annotation in data["annotations"]:
+            if annotation["supercategory"] == "pitch":
+                print(json.dumps(annotation, indent=4))
+                break
+
 if __name__ == "__main__":
     for folder in DATA_DIRECTORIES:
         path = os.path.join(DIRECTORIES_PATH, folder)
@@ -85,3 +95,4 @@ if __name__ == "__main__":
     )
     print_camera_annotations()
     check_goalkeeper_jersey()
+    
