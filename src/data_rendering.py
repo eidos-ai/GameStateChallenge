@@ -9,7 +9,7 @@ import sys
 import argparse
 import cv2 as cv  # type: ignore
 import numpy as np  # type: ignore
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt  # type: ignore
 
 
 class SoccerNetGS:
