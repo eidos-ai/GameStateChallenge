@@ -69,7 +69,9 @@ class SoccerNetGS:
             sys.exit()
         else:
             frame_directory = video_path + "/img1/"
-        random_frame = str(random.randint(0, 750)).zfill(6)  # 3 digit integer number of the frame
+        random_frame = str(random.randint(0, 750)).zfill(
+            6
+        )  # 3 digit integer number of the frame
         frame_name = (
             str(random_frame).zfill(6) + ".jpg"
         )  # filled 6 digit frame file name
@@ -256,7 +258,9 @@ class SoccerNetGS:
 if __name__ == "__main__":
     sn = SoccerNetGS()
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument("-v", "--video_number", type=int, required=True, help="Choose video number.")
+    parser.add_argument(
+        "-v", "--video_number", type=int, required=True, help="Choose video number."
+    )
     args = parser.parse_args()
     path_video, frame_random, path_frame = sn.find_video_path(args.video_number)
     annotations_objects = sn.get_object_annotations(path_video, frame_random)
