@@ -2,7 +2,6 @@ import os
 import torch
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
-import torch  # type: ignore
 import logging
 from dataclasses import dataclass
 from typing import List, Any
