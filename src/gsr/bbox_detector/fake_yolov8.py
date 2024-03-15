@@ -70,7 +70,7 @@ class FakeYOLOv8(ImageLevelModule):  # type: ignore
         self.model.to(device)
         self.id = 0
 
-    @torch.no_grad()
+    @torch.no_grad()  # type: ignore
     def preprocess(
         self,
         image: np.ndarray,
@@ -82,7 +82,7 @@ class FakeYOLOv8(ImageLevelModule):  # type: ignore
             "shape": (image.shape[1], image.shape[0]),
         }
 
-    @torch.no_grad()
+    @torch.no_grad()  # type: ignore
     def process(
         self, batch: Any, detections: pd.DataFrame, metadatas: pd.DataFrame
     ) -> pd.DataFrame:
