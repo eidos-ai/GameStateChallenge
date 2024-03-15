@@ -1,54 +1,53 @@
 import os
 import torch
 import numpy as np
-import pandas as pd
+import pandas as pd # type: ignore
 import torch
+import logging
 from dataclasses import dataclass
 from typing import List, Any
+from ultralytics import YOLO  # type: ignore
+from tracklab.pipeline.imagelevel_module import ImageLevelModule  # type: ignore
+from tracklab.utils.cv2 import cv2_load_image  # type: ignore
+from tracklab.utils.coordinates import ltrb_to_ltwh  # type: ignore
 
 os.environ["YOLO_VERBOSE"] = "False"
-from ultralytics import YOLO
-
-from tracklab.pipeline.imagelevel_module import ImageLevelModule
-from tracklab.utils.cv2 import cv2_load_image
-from tracklab.utils.coordinates import ltrb_to_ltwh
-
-import logging
-
 log = logging.getLogger(__name__)
 
+
 @dataclass
-class Box():
-    xyxy: List[int] # [left, top, right, bottom]
+class Box:
+    xyxy: List[int]  # [left, top, right, bottom]
     conf: float
     cls: int
-    
+
+
 class FakeModel(torch.nn.Module):
-    def __init__(self, model_path):
+    def __init__(self, model_path: str) -> None:
         super(FakeModel, self).__init__()
         self.model_path = model_path
         self.conv1 = torch.nn.Conv2d(963, 128, kernel_size=3, padding=1)
-        
-    def forward(self, images) -> List[Box]:
+
+    def forward(self, images: List[Any]) -> List[List[Box]]:
         fake_box1 = Box([200, 200, 400, 400], 0.85, 0)
         fake_box2 = Box([200, 500, 400, 700], 0.65, 0)
         fake_box3 = Box([800, 200, 400, 400], 0.3, 0)
-        
+
         fake_boxes = [fake_box1, fake_box2, fake_box3]
-        
         output = [fake_boxes for i, image in enumerate(images)]
         return output
-    
 
-def collate_fn(batch):
+
+def collate_fn(batch: List[Any]) -> tuple[List[Any], tuple[List[Any], List[Any]]]:
     idxs = [b[0] for b in batch]
     images = [b["image"] for _, b in batch]
     shapes = [b["shape"] for _, b in batch]
     return idxs, (images, shapes)
 
-class FakeYOLOv8(ImageLevelModule):
+
+class FakeYOLOv8(ImageLevelModule): # type: ignore
     collate_fn = collate_fn
-    input_columns = []
+    input_columns: List[str] = []
     output_columns = [
         "image_id",
         "video_id",
@@ -57,7 +56,8 @@ class FakeYOLOv8(ImageLevelModule):
         "bbox_conf",
     ]
 
-    def __init__(self, cfg, device, batch_size, **kwargs):
+
+    def __init__(self, cfg, device, batch_size, **kwargs) -> None:
         super().__init__(batch_size)
         self.cfg = cfg
         self.device = device
@@ -66,14 +66,14 @@ class FakeYOLOv8(ImageLevelModule):
         self.id = 0
 
     @torch.no_grad()
-    def preprocess(self, image, detections, metadata: pd.Series):
+    def preprocess(self, image, detections, metadata: pd.Series) -> dict[str, Any]:
         return {
             "image": image,
             "shape": (image.shape[1], image.shape[0]),
         }
 
     @torch.no_grad()
-    def process(self, batch: Any, detections: pd.DataFrame, metadatas: pd.DataFrame):
+    def process(self, batch: Any, detections: pd.DataFrame, metadatas: pd.DataFrame) -> pd.Dataframe:
         images, shapes = batch
         results_by_image = self.model(images)
         detections = []
