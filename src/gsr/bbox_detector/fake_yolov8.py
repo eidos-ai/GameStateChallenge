@@ -1,8 +1,8 @@
 import os
 import torch
-import numpy as np
+import numpy as np # type: ignore
 import pandas as pd # type: ignore
-import torch
+import torch #type: ignore
 import logging
 from dataclasses import dataclass
 from typing import List, Any
@@ -22,7 +22,7 @@ class Box:
     cls: int
 
 
-class FakeModel(torch.nn.Module):
+class FakeModel(torch.nn.Module): # type: ignore
     def __init__(self, model_path: str) -> None:
         super(FakeModel, self).__init__()
         self.model_path = model_path
