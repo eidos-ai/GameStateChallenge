@@ -9,6 +9,7 @@ from ultralytics import YOLO  # type: ignore
 from tracklab.pipeline.imagelevel_module import ImageLevelModule  # type: ignore
 from tracklab.utils.cv2 import cv2_load_image  # type: ignore
 from tracklab.utils.coordinates import ltrb_to_ltwh  # type: ignore
+from omegaconf import OmegaConf  # type: ignore
 
 os.environ["YOLO_VERBOSE"] = "False"
 log = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ class FakeYOLOv8(ImageLevelModule):  # type: ignore
 
     def __init__(
         self,
-        cfg: dict[Any, Any],
+        cfg: OmegaConf.dictconfig.DictConfig[Any, Any],
         device: str,
         batch_size: int,
         **kwargs: dict[str, Any]
