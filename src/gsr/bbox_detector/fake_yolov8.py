@@ -1,8 +1,8 @@
 import os
 import torch
-import numpy as np
-import pandas as pd # type: ignore
-import torch
+import numpy as np  # type: ignore
+import pandas as pd  # type: ignore
+import torch  # type: ignore
 import logging
 from dataclasses import dataclass
 from typing import List, Any
@@ -22,7 +22,7 @@ class Box:
     cls: int
 
 
-class FakeModel(torch.nn.Module):
+class FakeModel(torch.nn.Module):  # type: ignore
     def __init__(self, model_path: str) -> None:
         super(FakeModel, self).__init__()
         self.model_path = model_path
@@ -45,7 +45,7 @@ def collate_fn(batch: List[Any]) -> tuple[List[Any], tuple[List[Any], List[Any]]
     return idxs, (images, shapes)
 
 
-class FakeYOLOv8(ImageLevelModule): # type: ignore
+class FakeYOLOv8(ImageLevelModule):  # type: ignore
     collate_fn = collate_fn
     input_columns: List[str] = []
     output_columns = [
@@ -56,8 +56,13 @@ class FakeYOLOv8(ImageLevelModule): # type: ignore
         "bbox_conf",
     ]
 
-
-    def __init__(self, cfg: dict[Any, Any], device: str, batch_size: int, **kwargs: dict[str, Any]) -> None:
+    def __init__(
+        self,
+        cfg: dict[Any, Any],
+        device: str,
+        batch_size: int,
+        **kwargs: dict[str, Any]
+    ) -> None:
         super().__init__(batch_size)
         self.cfg = cfg
         self.device = device
@@ -66,7 +71,12 @@ class FakeYOLOv8(ImageLevelModule): # type: ignore
         self.id = 0
 
     @torch.no_grad()
-    def preprocess(self, image: np.ndarray[np.ndarray[Any]], detections: pd.DataFrame, metadata: pd.Series) -> dict[str, Any]:
+    def preprocess(
+        self,
+        image: np.ndarray[np.ndarray[Any]],
+        detections: pd.DataFrame,
+        metadata: pd.Series,
+    ) -> dict[str, Any]:
         print("type image [0]", type(image[0][0]))
         return {
             "image": image,
@@ -74,11 +84,15 @@ class FakeYOLOv8(ImageLevelModule): # type: ignore
         }
 
     @torch.no_grad()
-    def process(self, batch: Any, detections: pd.DataFrame, metadatas: pd.DataFrame) -> pd.DataFrame:
+    def process(
+        self, batch: Any, detections: pd.DataFrame, metadatas: pd.DataFrame
+    ) -> pd.DataFrame:
         images, shapes = batch
         results_by_image = self.model(images)
         detections = []
-        for image_results, shape, (_, metadata) in zip(results_by_image, shapes, metadatas.iterrows()):
+        for image_results, shape, (_, metadata) in zip(
+            results_by_image, shapes, metadatas.iterrows()
+        ):
             for bbox in image_results:
                 # check for `person` class
                 if bbox.cls == 0 and bbox.conf >= self.cfg.min_confidence:
