@@ -1,8 +1,8 @@
 import os
 import torch
-import numpy as np # type: ignore
+import numpy as np
 import pandas as pd # type: ignore
-import torch #type: ignore
+import torch
 import logging
 from dataclasses import dataclass
 from typing import List, Any
@@ -22,7 +22,7 @@ class Box:
     cls: int
 
 
-class FakeModel(torch.nn.Module): # type: ignore
+class FakeModel(torch.nn.Module):
     def __init__(self, model_path: str) -> None:
         super(FakeModel, self).__init__()
         self.model_path = model_path
@@ -57,7 +57,7 @@ class FakeYOLOv8(ImageLevelModule): # type: ignore
     ]
 
 
-    def __init__(self, cfg, device, batch_size, **kwargs) -> None:
+    def __init__(self, cfg: dict[Any, Any], device: str, batch_size: int, **kwargs: dict[str, Any]) -> None:
         super().__init__(batch_size)
         self.cfg = cfg
         self.device = device
@@ -66,14 +66,15 @@ class FakeYOLOv8(ImageLevelModule): # type: ignore
         self.id = 0
 
     @torch.no_grad()
-    def preprocess(self, image, detections, metadata: pd.Series) -> dict[str, Any]:
+    def preprocess(self, image: np.ndarray[np.ndarray[Any]], detections: pd.DataFrame, metadata: pd.Series) -> dict[str, Any]:
+        print("type image [0]", type(image[0][0]))
         return {
             "image": image,
             "shape": (image.shape[1], image.shape[0]),
         }
 
     @torch.no_grad()
-    def process(self, batch: Any, detections: pd.DataFrame, metadatas: pd.DataFrame) -> pd.Dataframe:
+    def process(self, batch: Any, detections: pd.DataFrame, metadatas: pd.DataFrame) -> pd.DataFrame:
         images, shapes = batch
         results_by_image = self.model(images)
         detections = []
