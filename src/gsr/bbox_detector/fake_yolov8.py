@@ -73,12 +73,10 @@ class FakeYOLOv8(ImageLevelModule):  # type: ignore
     @torch.no_grad()
     def preprocess(
         self,
-        image: list[Any],
+        image: np.ndarray,
         detections: pd.DataFrame,
         metadata: pd.Series,
     ) -> dict[str, Any]:
-        print("type image [0]", type(image[0][0]))
-        print("image shape", image.shape)
         return {
             "image": image,
             "shape": (image.shape[1], image.shape[0]),
