@@ -4,7 +4,7 @@ from typing import Any
 import os
 import json
 
-DIRECTORIES_PATH = "./data/SoccerNetGS/gamestate-2024/"
+DIRECTORIES_PATH = "../data/SoccerNetGS/gamestate-2024/"
 DATA_DIRECTORIES = ["challenge", "test", "train", "valid"]
 
 
