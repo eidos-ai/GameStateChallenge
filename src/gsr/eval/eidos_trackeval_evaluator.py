@@ -100,9 +100,13 @@ class TrackEvalEvaluator(EvaluatorBase):
         # if the dataset has the process_trackeval_results method, use it to process the results
         if hasattr(self.tracking_dataset, 'process_trackeval_results'):
             results = self.tracking_dataset.process_trackeval_results(results, dataset_config, eval_config)
-        print("-----------------------------")
-        print(results)
-        print("-----------------------------")
+        if self.cfg.neptune:
+            print("-----------------------------")
+            print(f"GS-HOTA {results['GS-HOTA']['GS-HOTA']}")
+            print(f"DetA {results['GS-HOTA']['DetA']}")
+            print(f"LocA {results['GS-HOTA']['LocA']}")
+            print(f"AssA {results['GS-HOTA']['AssA']}")
+            print("-----------------------------")
 
 
 def _print_results(
