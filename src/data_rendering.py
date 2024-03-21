@@ -16,7 +16,7 @@ class SoccerNetGS:
     """Class to render a random frame from a SoccerNetGS
     video with object annotations and pitch lines."""
 
-    DATA_DIRECTORY = "./data/SoccerNetGS/gamestate-2024/"
+    DATA_DIRECTORY = "../data/SoccerNetGS/gamestate-2024/"
     RADAR_PATH = "./sn-gamestate/sn_gamestate/visualization/Radar.png"
 
     def __init__(self) -> None:
