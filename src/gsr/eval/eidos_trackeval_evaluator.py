@@ -1,8 +1,11 @@
 import numpy as np
 import trackeval
+import sys
 from pathlib import Path
 from tabulate import tabulate
 from tracklab.core import Evaluator as EvaluatorBase
+
+sys.path.append("..")
 from utils.neptune_logger import NeptuneLogger
 
 
