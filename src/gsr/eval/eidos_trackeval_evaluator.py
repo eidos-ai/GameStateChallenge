@@ -44,7 +44,7 @@ class TrackEvalEvaluator(EvaluatorBase):
         )
 
     def run(self, tracker_state):
-        self.log.info(
+        log.info(
             "Starting evaluation using TrackEval library (https://github.com/JonathonLuiten/TrackEval)"
         )
 
@@ -67,7 +67,7 @@ class TrackEvalEvaluator(EvaluatorBase):
             is_ground_truth=False,
         )
 
-        self.log.info(
+        log.info(
             f"Tracking predictions saved in {self.trackeval_dataset_name} format in {pred_save_path}"
         )
 
@@ -90,7 +90,7 @@ class TrackEvalEvaluator(EvaluatorBase):
                 is_ground_truth=True,
             )
 
-        self.log.info(
+        log.info(
             f"Tracking ground truth saved in {self.trackeval_dataset_name} format in {pred_save_path}"
         )
 
@@ -162,9 +162,7 @@ def _print_results(
 ):
     headers = res_combined.keys()
     data = [format_metric(name, res_combined[name], scale_factor) for name in headers]
-    TrackEvalEvaluator.log.info(
-        f"{title}\n" + tabulate([data], headers=headers, tablefmt="plain")
-    )
+    log.info(f"{title}\n" + tabulate([data], headers=headers, tablefmt="plain"))
     if print_by_video and res_by_video:
         data = []
         for video_name, res in res_by_video.items():
@@ -173,7 +171,7 @@ def _print_results(
             ]
             data.append(video_data)
         headers = ["video"] + list(headers)
-        TrackEvalEvaluator.log.info(
+        log.info(
             f"{title} by videos\n" + tabulate(data, headers=headers, tablefmt="plain")
         )
 
