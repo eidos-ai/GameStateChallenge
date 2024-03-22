@@ -1,20 +1,17 @@
 import numpy as np
 import trackeval
+import logging
 import sys
 from pathlib import Path
 from tabulate import tabulate
 from tracklab.core import Evaluator as EvaluatorBase
+from gsr.utils.neptune_logger import NeptuneLogger
 
-sys.path.append("..")
-from utils.neptune_logger import NeptuneLogger
+logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s")
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
 
 
-# import logging
-# import neptune
-# from neptune.types import File
-# logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s")
-# log = logging.getLogger(__name__)
-# log.setLevel(logging.INFO)
 class TrackEvalEvaluator(EvaluatorBase):
     """
     Evaluator using the TrackEval library (https://github.com/JonathonLuiten/TrackEval).
@@ -40,7 +37,7 @@ class TrackEvalEvaluator(EvaluatorBase):
         )
         self.show_progressbar = show_progressbar
         self.dataset_path = dataset_path
-        self.log = NeptuneLogger(
+        self.neptune_logger = NeptuneLogger(
             enable_run=self.cfg.neptune,
             project="eidos/GameStateChallenge",
             run_name_or_id="GAM-OBJ",
@@ -150,10 +147,10 @@ class TrackEvalEvaluator(EvaluatorBase):
                 results, dataset_config, eval_config
             )
         if self.cfg.neptune:
-            self.neptune_run["GS-HOTA"] = results["GS-HOTA"]["GS-HOTA"]
-            self.neptune_run["DetA"] = results["GS-HOTA"]["DetA"]
-            self.neptune_run["LocA"] = results["GS-HOTA"]["LocA"]
-            self.neptune_run["AssA"] = results["GS-HOTA"]["AssA"]
+            self.neptune_logger["GS-HOTA"] = results["GS-HOTA"]["GS-HOTA"]
+            self.neptune_logger["DetA"] = results["GS-HOTA"]["DetA"]
+            self.neptune_logger["LocA"] = results["GS-HOTA"]["LocA"]
+            self.neptune_logger["AssA"] = results["GS-HOTA"]["AssA"]
 
 
 def _print_results(
