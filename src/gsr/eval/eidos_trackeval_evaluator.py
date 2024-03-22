@@ -147,10 +147,10 @@ class TrackEvalEvaluator(EvaluatorBase):
                 results, dataset_config, eval_config
             )
         if self.cfg.neptune:
-            self.neptune_logger["GS-HOTA"] = results["GS-HOTA"]["GS-HOTA"]
-            self.neptune_logger["DetA"] = results["GS-HOTA"]["DetA"]
-            self.neptune_logger["LocA"] = results["GS-HOTA"]["LocA"]
-            self.neptune_logger["AssA"] = results["GS-HOTA"]["AssA"]
+            self.neptune_logger.log("GS-HOTA", results["GS-HOTA"]["GS-HOTA"])
+            self.neptune_logger.log("DetA", results["GS-HOTA"]["DetA"])
+            self.neptune_logger.log("LocA", results["GS-HOTA"]["LocA"])
+            self.neptune_logger.log("AssA", results["GS-HOTA"]["AssA"])
 
 
 def _print_results(
