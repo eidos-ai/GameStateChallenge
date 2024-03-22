@@ -37,7 +37,7 @@ class TrackEvalEvaluator(EvaluatorBase):
         self.show_progressbar = show_progressbar
         self.dataset_path = dataset_path
         if self.cfg.neptune:
-            self.run = neptune.init_run(project="eidos/GameStateChallenge")
+            self.neptune_run = neptune.init_run(project="eidos/GameStateChallenge")
             self.model = neptune.init_model(
                 with_id="GAM-OBJ", project="eidos/GameStateChallenge"
             )
@@ -148,10 +148,10 @@ class TrackEvalEvaluator(EvaluatorBase):
                 results, dataset_config, eval_config
             )
         if self.cfg.neptune:
-            self.run["GS-HOTA"] = results["GS-HOTA"]["GS-HOTA"]
-            self.run["DetA"] = results["GS-HOTA"]["DetA"]
-            self.run["LocA"] = results["GS-HOTA"]["LocA"]
-            self.run["AssA"] = results["GS-HOTA"]["AssA"]
+            self.neptune_run["GS-HOTA"] = results["GS-HOTA"]["GS-HOTA"]
+            self.neptune_run["DetA"] = results["GS-HOTA"]["DetA"]
+            self.neptune_run["LocA"] = results["GS-HOTA"]["LocA"]
+            self.neptune_run["AssA"] = results["GS-HOTA"]["AssA"]
 
 
 def _print_results(
