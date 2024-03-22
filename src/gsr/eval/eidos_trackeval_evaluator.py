@@ -1,18 +1,17 @@
 import numpy as np
-import logging
 import trackeval
-import neptune
-
 from pathlib import Path
 from tabulate import tabulate
 from tracklab.core import Evaluator as EvaluatorBase
-from neptune.types import File
-
-logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s")
-log = logging.getLogger(__name__)
-log.setLevel(logging.INFO)
+from utils.neptune_logger import NeptuneLogger
 
 
+# import logging
+# import neptune
+# from neptune.types import File
+# logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s")
+# log = logging.getLogger(__name__)
+# log.setLevel(logging.INFO)
 class TrackEvalEvaluator(EvaluatorBase):
     """
     Evaluator using the TrackEval library (https://github.com/JonathonLuiten/TrackEval).
@@ -38,18 +37,14 @@ class TrackEvalEvaluator(EvaluatorBase):
         )
         self.show_progressbar = show_progressbar
         self.dataset_path = dataset_path
-        if self.cfg.neptune:
-            self.neptune_run = neptune.init_run(project="eidos/GameStateChallenge")
-            self.model = neptune.init_model(
-                with_id="GAM-OBJ", project="eidos/GameStateChallenge"
-            )
-            self.model_version = neptune.init_model_version(
-                model="GAM-OBJ",
-                project="eidos/GameStateChallenge",
-            )
+        self.log = NeptuneLogger(
+            enable_run=self.cfg.neptune,
+            project="eidos/GameStateChallenge",
+            run_name_or_id="GAM-OBJ",
+        )
 
     def run(self, tracker_state):
-        log.info(
+        self.log.info(
             "Starting evaluation using TrackEval library (https://github.com/JonathonLuiten/TrackEval)"
         )
 
@@ -72,12 +67,12 @@ class TrackEvalEvaluator(EvaluatorBase):
             is_ground_truth=False,
         )
 
-        log.info(
+        self.log.info(
             f"Tracking predictions saved in {self.trackeval_dataset_name} format in {pred_save_path}"
         )
 
         if tracker_state.detections_gt is None or len(tracker_state.detections_gt) == 0:
-            log.warning(
+            self.log.warning(
                 f"Stopping evaluation because the current split ({self.eval_set}) has no ground truth detections."
             )
             return
@@ -95,7 +90,7 @@ class TrackEvalEvaluator(EvaluatorBase):
                 is_ground_truth=True,
             )
 
-        log.info(
+        self.log.info(
             f"Tracking ground truth saved in {self.trackeval_dataset_name} format in {pred_save_path}"
         )
 
@@ -129,7 +124,9 @@ class TrackEvalEvaluator(EvaluatorBase):
                 metric = getattr(trackeval.metrics, metric_name)
                 metrics_list.append(metric(metrics_config))
             except AttributeError:
-                log.warning(f"Skipping evaluation for unknown metric: {metric_name}")
+                self.log.warning(
+                    f"Skipping evaluation for unknown metric: {metric_name}"
+                )
 
         # Build evaluator
         eval_config = trackeval.Evaluator.get_default_eval_config()
@@ -165,7 +162,9 @@ def _print_results(
 ):
     headers = res_combined.keys()
     data = [format_metric(name, res_combined[name], scale_factor) for name in headers]
-    log.info(f"{title}\n" + tabulate([data], headers=headers, tablefmt="plain"))
+    TrackEvalEvaluator.log.info(
+        f"{title}\n" + tabulate([data], headers=headers, tablefmt="plain")
+    )
     if print_by_video and res_by_video:
         data = []
         for video_name, res in res_by_video.items():
@@ -174,7 +173,7 @@ def _print_results(
             ]
             data.append(video_data)
         headers = ["video"] + list(headers)
-        log.info(
+        TrackEvalEvaluator.log.info(
             f"{title} by videos\n" + tabulate(data, headers=headers, tablefmt="plain")
         )
 
