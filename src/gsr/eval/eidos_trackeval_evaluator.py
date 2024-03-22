@@ -38,11 +38,12 @@ class TrackEvalEvaluator(EvaluatorBase):
         self.dataset_path = dataset_path
         if self.cfg.neptune:
             self.run = neptune.init_run(project="eidos/GameStateChallenge")
-            self.model = neptune.init_model(model="GAMESTATE-EIDOS")
+            self.model = neptune.init_model(
+                with_id="GAM-OBJ", project="eidos/GameStateChallenge"
+            )
             self.model_version = neptune.init_model_version(
-                model="GAMESTATE-EIDOS",
+                model="GAM-OBJ",
                 project="eidos/GameStateChallenge",
-                version="v0.0.1",
             )
 
     def run(self, tracker_state):
