@@ -8,7 +8,9 @@ from tabulate import tabulate
 from tracklab.core import Evaluator as EvaluatorBase
 from neptune.types import File
 
+logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s")
 log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
 
 
 class TrackEvalEvaluator(EvaluatorBase):
