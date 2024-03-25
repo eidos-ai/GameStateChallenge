@@ -8,6 +8,9 @@ from tabulate import tabulate  # type: ignore
 from tracklab.core import Evaluator as EvaluatorBase  # type: ignore
 from gsr.utils.neptune_logger import NeptuneLogger
 from typing import Union
+from omegaconf import OmegaConf  # type: ignore
+from tracklab.tracklab.wrappers.datasets.soccernet.soccernet_game_state import SoccerNetGameState  # type: ignore
+from tracklab.tracklab.datastruct.tracker_state import TrackerState  # type: ignore
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s")
 log = logging.getLogger(__name__)
@@ -22,21 +25,14 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
 
     def __init__(
         self,
-        cfg,
-        eval_set,
-        show_progressbar,
-        dataset_path,
-        tracking_dataset,
+        cfg: OmegaConf.dictconfig.DictConfig[Any, Any],
+        eval_set: str,
+        show_progressbar: bool,
+        dataset_path: str,
+        tracking_dataset: SoccerNetGameState,
         *args: tuple[Any],
         **kwargs: dict[str, Any],
     ) -> None:
-        print("--------------------")
-        print("cfg", type(cfg))
-        print("eval_set", type(eval_set))
-        print("show_progressbar", type(show_progressbar))
-        print("dataset_path", type(dataset_path))
-        print("tracking_dataset", type(tracking_dataset))
-        print("--------------------")
         self.cfg = cfg
         self.tracking_dataset = tracking_dataset
         self.eval_set = eval_set
@@ -52,10 +48,7 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
             run_name_or_id="GAM-OBJ",
         )
 
-    def run(self, tracker_state) -> None:
-        print("--------------------")
-        print("tracker_state", type(tracker_state))
-        print("--------------------")
+    def run(self, tracker_state: TrackerState) -> None:
         log.info(
             "Starting evaluation using TrackEval library (https://github.com/JonathonLuiten/TrackEval)"
         )
@@ -166,15 +159,12 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
 
 
 def _print_results(
-    res_combined,
-    res_by_video=None,
+    res_combined: dict[str, Any],
+    res_by_video: bool = None,
     scale_factor: float = 1.0,
     title: str = "",
     print_by_video: bool = False,
 ) -> None:
-    print("--------------------")
-    print("res_combined", type(res_combined))
-    print("--------------------")
     headers = res_combined.keys()
     data: list[Any] = [
         format_metric(name, res_combined[name], scale_factor) for name in headers
