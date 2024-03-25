@@ -1,9 +1,9 @@
 import argparse
 from pathlib import Path
-from ultralytics import YOLO, settings
+from ultralytics import YOLO, settings  # type: ignore
 
 from gsr.utils.neptune_logger import NeptuneLogger
-from misc.utils import load_yaml
+from misc.utils import load_yaml  # type: ignore
 
 settings.update({"neptune": False})
 

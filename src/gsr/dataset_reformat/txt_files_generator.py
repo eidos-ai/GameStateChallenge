@@ -5,7 +5,7 @@ import shutil
 DIRECTORIES_PATH = "data/SoccerNetGS/gamestate-2024/"
 
 
-def format_images(folder):
+def format_images(folder: str) -> None:
     if folder == "val":
         folder = "valid"
     folder_path = os.path.join(DIRECTORIES_PATH, folder)
@@ -32,7 +32,7 @@ def format_images(folder):
     )
 
 
-def create_annotation_txt_file(folder):
+def create_annotation_txt_file(folder: str) -> None:
     """from Labels-GameState.json, get the annotations of the corresponding image and
     write them to a txt file in YOLOv8 format"""
     if folder == "val":
