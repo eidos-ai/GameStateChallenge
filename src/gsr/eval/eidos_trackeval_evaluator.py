@@ -30,6 +30,13 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
         *args: tuple[Any],
         **kwargs: dict[str, Any],
     ) -> None:
+        print("--------------------")
+        print("cfg", type(cfg))
+        print("eval_set", type(eval_set))
+        print("show_progressbar", type(show_progressbar))
+        print("dataset_path", type(dataset_path))
+        print("tracking_dataset", type(tracking_dataset))
+        print("--------------------")
         self.cfg = cfg
         self.tracking_dataset = tracking_dataset
         self.eval_set = eval_set
@@ -46,6 +53,9 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
         )
 
     def run(self, tracker_state) -> None:
+        print("--------------------")
+        print("tracker_state", type(tracker_state))
+        print("--------------------")
         log.info(
             "Starting evaluation using TrackEval library (https://github.com/JonathonLuiten/TrackEval)"
         )
@@ -158,10 +168,13 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
 def _print_results(
     res_combined,
     res_by_video=None,
-    scale_factor=1.0,
-    title="",
-    print_by_video=False,
+    scale_factor: float = 1.0,
+    title: str = "",
+    print_by_video: bool = False,
 ) -> None:
+    print("--------------------")
+    print("res_combined", type(res_combined))
+    print("--------------------")
     headers = res_combined.keys()
     data: list[Any] = [
         format_metric(name, res_combined[name], scale_factor) for name in headers
