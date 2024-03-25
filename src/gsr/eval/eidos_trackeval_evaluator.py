@@ -160,7 +160,7 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
 
 def _print_results(
     res_combined: dict[str, Any],
-    res_by_video: dict[str, Any] = None,
+    res_by_video: dict[str, Any] | None = None,
     scale_factor: float = 1.0,
     title: str = "",
     print_by_video: bool = False,
