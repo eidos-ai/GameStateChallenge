@@ -30,7 +30,7 @@ class NeptuneLogger:
         if NEPTUNE_API_TOKEN is None:
             raise Exception("NEPTUNE_API_TOKEN is required")
 
-    def get_id(self) -> str:
+    def get_id(self) -> Any:
         return self.run_id
 
     def param(self, name: str, value: Any) -> None:
@@ -61,6 +61,6 @@ class NeptuneLogger:
         if self.enable_run:
             self.neptune_run.stop()
 
-    def fetch(self, param_name: str) -> None:
+    def fetch(self, param_name: str) -> Any:
         if self.enable_run:
             return self.neptune_run[param_name].fetch()

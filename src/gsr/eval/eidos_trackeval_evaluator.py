@@ -4,7 +4,7 @@ import logging
 import sys
 from typing import Any
 from pathlib import Path
-from tabulate import tabulate
+from tabulate import tabulate  # type: ignore
 from tracklab.core import Evaluator as EvaluatorBase  # type: ignore
 from gsr.utils.neptune_logger import NeptuneLogger
 from typing import Union
@@ -45,7 +45,7 @@ class TrackEvalEvaluator(EvaluatorBase):
             run_name_or_id="GAM-OBJ",
         )
 
-    def run(self, tracker_state):
+    def run(self, tracker_state) -> None:
         log.info(
             "Starting evaluation using TrackEval library (https://github.com/JonathonLuiten/TrackEval)"
         )
@@ -161,12 +161,12 @@ def _print_results(
     scale_factor=1.0,
     title="",
     print_by_video=False,
-):
+) -> None:
     headers = res_combined.keys()
     data = [format_metric(name, res_combined[name], scale_factor) for name in headers]
     log.info(f"{title}\n" + tabulate([data], headers=headers, tablefmt="plain"))
     if print_by_video and res_by_video:
-        data = []
+        data: list[Any] = []
         for video_name, res in res_by_video.items():
             video_data = [video_name] + [
                 format_metric(name, res[name], scale_factor) for name in headers
