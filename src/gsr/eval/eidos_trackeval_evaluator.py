@@ -160,7 +160,7 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
 
 def _print_results(
     res_combined: dict[str, Any],
-    res_by_video: bool = None,
+    res_by_video: dict[str, Any] = None,
     scale_factor: float = 1.0,
     title: str = "",
     print_by_video: bool = False,
@@ -177,7 +177,7 @@ def _print_results(
                 format_metric(name, res[name], scale_factor) for name in headers
             ]
             data.append(video_data)
-        headers = ["video"] + list(headers)
+        headers = ["video"] + list(headers)  # type: ignore
         log.info(
             f"{title} by videos\n" + tabulate(data, headers=headers, tablefmt="plain")
         )
