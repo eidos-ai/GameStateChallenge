@@ -1,11 +1,13 @@
-import numpy as np
-import trackeval
+import numpy as np  # type: ignore
+import trackeval  # type: ignore
 import logging
 import sys
+from typing import Any
 from pathlib import Path
 from tabulate import tabulate
-from tracklab.core import Evaluator as EvaluatorBase
+from tracklab.core import Evaluator as EvaluatorBase  # type: ignore
 from gsr.utils.neptune_logger import NeptuneLogger
+from typing import Union
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s")
 log = logging.getLogger(__name__)
@@ -25,9 +27,9 @@ class TrackEvalEvaluator(EvaluatorBase):
         show_progressbar,
         dataset_path,
         tracking_dataset,
-        *args,
-        **kwargs,
-    ):
+        *args: tuple[Any],
+        **kwargs: dict[str, Any],
+    ) -> None:
         self.cfg = cfg
         self.tracking_dataset = tracking_dataset
         self.eval_set = eval_set
@@ -176,7 +178,9 @@ def _print_results(
         )
 
 
-def format_metric(metric_name, metric_value, scale_factor):
+def format_metric(
+    metric_name: str, metric_value: float, scale_factor: float
+) -> Union[int, float]:
     if (
         "TP" in metric_name
         or "FN" in metric_name
