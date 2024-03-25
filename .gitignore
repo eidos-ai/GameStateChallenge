@@ -5,8 +5,9 @@ env
 .ipynb_checkpoints
 .mypy_cache
 
-# Data folder
+# Data folders
 data/
+yolo_dataset/
 
 # Python cache folder
 __pycache__/
