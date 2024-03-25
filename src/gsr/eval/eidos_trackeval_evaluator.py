@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
 
-class TrackEvalEvaluator(EvaluatorBase):
+class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
     """
     Evaluator using the TrackEval library (https://github.com/JonathonLuiten/TrackEval).
     Save on disk the tracking predictions and ground truth in MOT Challenge format and run the evaluation by calling TrackEval.
@@ -163,10 +163,12 @@ def _print_results(
     print_by_video=False,
 ) -> None:
     headers = res_combined.keys()
-    data = [format_metric(name, res_combined[name], scale_factor) for name in headers]
+    data: list[Any] = [
+        format_metric(name, res_combined[name], scale_factor) for name in headers
+    ]
     log.info(f"{title}\n" + tabulate([data], headers=headers, tablefmt="plain"))
     if print_by_video and res_by_video:
-        data: list[Any] = []
+        data = []
         for video_name, res in res_by_video.items():
             video_data = [video_name] + [
                 format_metric(name, res[name], scale_factor) for name in headers
