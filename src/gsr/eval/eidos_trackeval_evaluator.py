@@ -203,7 +203,7 @@ def format_metric(
         or "TN" in metric_name
     ):
         if metric_name == "MOTP":
-            return np.around(metric_value * scale_factor, 3)
+            return float(np.around(metric_value * scale_factor, 3))
         return int(metric_value)
     else:
-        return np.around(metric_value * scale_factor, 3)
+        return float(np.around(metric_value * scale_factor, 3))
