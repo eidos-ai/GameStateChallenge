@@ -1,0 +1,199 @@
+import numpy as np  # type: ignore
+import trackeval  # type: ignore
+import logging
+import sys
+from typing import Any
+from pathlib import Path
+from tabulate import tabulate  # type: ignore
+from tracklab.core import Evaluator as EvaluatorBase  # type: ignore
+from gsr.utils.neptune_logger import NeptuneLogger
+from typing import Union
+from omegaconf import OmegaConf  # type: ignore
+from tracklab.tracklab.wrappers.datasets.soccernet.soccernet_game_state import SoccerNetGameState  # type: ignore
+from tracklab.tracklab.datastruct.tracker_state import TrackerState  # type: ignore
+
+logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s")
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
+
+
+class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
+    """
+    Evaluator using the TrackEval library (https://github.com/JonathonLuiten/TrackEval).
+    Save on disk the tracking predictions and ground truth in MOT Challenge format and run the evaluation by calling TrackEval.
+    """
+
+    def __init__(
+        self,
+        cfg: OmegaConf.dictconfig.DictConfig[Any, Any],
+        eval_set: str,
+        show_progressbar: bool,
+        dataset_path: str,
+        tracking_dataset: SoccerNetGameState,
+        *args: tuple[Any],
+        **kwargs: dict[str, Any],
+    ) -> None:
+        self.cfg = cfg
+        self.tracking_dataset = tracking_dataset
+        self.eval_set = eval_set
+        self.trackeval_dataset_name = cfg.dataset.dataset_class
+        self.trackeval_dataset_class = getattr(
+            trackeval.datasets, self.trackeval_dataset_name
+        )
+        self.show_progressbar = show_progressbar
+        self.dataset_path = dataset_path
+        self.neptune_logger = NeptuneLogger(
+            enable_run=self.cfg.neptune,
+            project="eidos/GameStateChallenge",
+            run_name_or_id="GAM-OBJ",
+        )
+
+    def run(self, tracker_state: TrackerState) -> None:
+        log.info(
+            "Starting evaluation using TrackEval library (https://github.com/JonathonLuiten/TrackEval)"
+        )
+
+        tracker_name = "tracklab"
+        save_classes = self.trackeval_dataset_class.__name__ != "MotChallenge2DBox"
+
+        # Save predictions
+        pred_save_path = (
+            Path(self.cfg.dataset.TRACKERS_FOLDER)
+            / f"{self.trackeval_dataset_class.__name__}-{self.eval_set}"
+            / tracker_name
+        )
+        self.tracking_dataset.save_for_eval(
+            tracker_state.detections_pred,
+            tracker_state.image_pred,
+            tracker_state.video_metadatas,
+            pred_save_path,
+            self.cfg.bbox_column_for_eval,
+            save_classes,  # do not use classes for MOTChallenge2DBox
+            is_ground_truth=False,
+        )
+
+        log.info(
+            f"Tracking predictions saved in {self.trackeval_dataset_name} format in {pred_save_path}"
+        )
+
+        if tracker_state.detections_gt is None or len(tracker_state.detections_gt) == 0:
+            self.log.warning(
+                f"Stopping evaluation because the current split ({self.eval_set}) has no ground truth detections."
+            )
+            return
+
+        # Save ground truth
+        if self.cfg.save_gt:
+            self.tracking_dataset.save_for_eval(
+                tracker_state.detections_gt,
+                tracker_state.image_gt,
+                tracker_state.video_metadatas,
+                Path(self.cfg.dataset.GT_FOLDER)
+                / f"{self.trackeval_dataset_name}-{self.eval_set}",
+                self.cfg.bbox_column_for_eval,
+                save_classes,
+                is_ground_truth=True,
+            )
+
+        log.info(
+            f"Tracking ground truth saved in {self.trackeval_dataset_name} format in {pred_save_path}"
+        )
+
+        # Build TrackEval dataset
+        dataset_config = self.trackeval_dataset_class.get_default_dataset_config()
+        dataset_config["SEQ_INFO"] = tracker_state.video_metadatas.set_index("name")[
+            "nframes"
+        ].to_dict()
+        dataset_config["BENCHMARK"] = (
+            self.trackeval_dataset_class.__name__
+        )  # required for trackeval.datasets.MotChallenge2DBox
+        for key, value in self.cfg.dataset.items():
+            dataset_config[key] = value
+
+        if not self.cfg.save_gt:
+            dataset_config["GT_FOLDER"] = self.dataset_path  # Location of GT data
+            dataset_config["GT_LOC_FORMAT"] = (
+                "{gt_folder}/{seq}/Labels-GameState.json"  # '{gt_folder}/{seq}/gt/gt.txt'
+            )
+        dataset = self.trackeval_dataset_class(dataset_config)
+
+        # Build metrics
+        metrics_config = {
+            "METRICS": set(self.cfg.metrics),
+            "PRINT_CONFIG": False,
+            "THRESHOLD": 0.5,
+        }
+        metrics_list = []
+        for metric_name in self.cfg.metrics:
+            try:
+                metric = getattr(trackeval.metrics, metric_name)
+                metrics_list.append(metric(metrics_config))
+            except AttributeError:
+                self.log.warning(
+                    f"Skipping evaluation for unknown metric: {metric_name}"
+                )
+
+        # Build evaluator
+        eval_config = trackeval.Evaluator.get_default_eval_config()
+        for key, value in self.cfg.eval.items():
+            eval_config[key] = value
+        evaluator = trackeval.Evaluator(eval_config)
+
+        # Run evaluation
+        output_res, output_msg = evaluator.evaluate(
+            [dataset], metrics_list, show_progressbar=self.show_progressbar
+        )
+
+        # Log results
+        results = output_res[dataset.get_name()][tracker_name]
+        # if the dataset has the process_trackeval_results method, use it to process the results
+        if hasattr(self.tracking_dataset, "process_trackeval_results"):
+            results = self.tracking_dataset.process_trackeval_results(
+                results, dataset_config, eval_config
+            )
+        if self.cfg.neptune:
+            self.neptune_logger.log("GS-HOTA", results["GS-HOTA"]["GS-HOTA"])
+            self.neptune_logger.log("DetA", results["GS-HOTA"]["DetA"])
+            self.neptune_logger.log("LocA", results["GS-HOTA"]["LocA"])
+            self.neptune_logger.log("AssA", results["GS-HOTA"]["AssA"])
+
+
+def _print_results(
+    res_combined: dict[str, Any],
+    res_by_video: dict[str, Any] | None = None,
+    scale_factor: float = 1.0,
+    title: str = "",
+    print_by_video: bool = False,
+) -> None:
+    headers = res_combined.keys()
+    data: list[Any] = [
+        format_metric(name, res_combined[name], scale_factor) for name in headers
+    ]
+    log.info(f"{title}\n" + tabulate([data], headers=headers, tablefmt="plain"))
+    if print_by_video and res_by_video:
+        data = []
+        for video_name, res in res_by_video.items():
+            video_data = [video_name] + [
+                format_metric(name, res[name], scale_factor) for name in headers
+            ]
+            data.append(video_data)
+        headers = ["video"] + list(headers)  # type: ignore
+        log.info(
+            f"{title} by videos\n" + tabulate(data, headers=headers, tablefmt="plain")
+        )
+
+
+def format_metric(
+    metric_name: str, metric_value: float, scale_factor: float
+) -> Union[int, float]:
+    if (
+        "TP" in metric_name
+        or "FN" in metric_name
+        or "FP" in metric_name
+        or "TN" in metric_name
+    ):
+        if metric_name == "MOTP":
+            return float(np.around(metric_value * scale_factor, 3))
+        return int(metric_value)
+    else:
+        return float(np.around(metric_value * scale_factor, 3))
