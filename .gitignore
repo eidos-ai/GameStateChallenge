@@ -7,7 +7,6 @@ env
 
 # Data folders
 data/
-yolov8_dataset/
 
 # Python cache folder
 __pycache__/
