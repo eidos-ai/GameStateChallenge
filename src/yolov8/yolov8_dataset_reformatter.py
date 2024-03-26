@@ -5,10 +5,10 @@ import shutil
 DIRECTORIES_PATH = "data/SoccerNetGS/gamestate-2024/"
 
 
-def create_yolov8_dataset_folders() -> None:
+def create_yolov8_dataset_folders(folder) -> None:
     """Create the YOLOv8 dataset folders"""
-    os.makedirs(f"yolov11_dataset/{folder}/images", exist_ok=True)
-    os.makedirs(f"yolov11_dataset/{folder}/labels", exist_ok=True)
+    os.makedirs(f"yolov8_dataset/{folder}/images", exist_ok=True)
+    os.makedirs(f"yolov8_dataset/{folder}/labels", exist_ok=True)
     print("Done: the YOLOv8 dataset folders were successfully created.")
 
 
