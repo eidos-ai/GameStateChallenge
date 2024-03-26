@@ -5,6 +5,13 @@ import shutil
 DIRECTORIES_PATH = "data/SoccerNetGS/gamestate-2024/"
 
 
+def create_yolov8_dataset_folders() -> None:
+    """Create the YOLOv8 dataset folders"""
+    os.makedirs(f"yolov11_dataset/{folder}/images", exist_ok=True)
+    os.makedirs(f"yolov11_dataset/{folder}/labels", exist_ok=True)
+    print("Done: the YOLOv8 dataset folders were successfully created.")
+
+
 def format_images(folder: str) -> None:
     if folder == "val":
         folder = "valid"
@@ -94,5 +101,6 @@ def create_annotation_txt_file(folder: str) -> None:
 if __name__ == "__main__":
     folders = ["train", "test", "val"]
     for folder in folders:
+        create_yolov8_dataset_folders(folder)
         format_images(folder)
         create_annotation_txt_file(folder)
