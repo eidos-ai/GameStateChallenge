@@ -90,7 +90,6 @@ if __name__ == "__main__":
     neptune_logger.param("Eval conf th", args.eval_conf_th)
     neptune_logger.param("batch size", args.batch_size)
     neptune_logger.param("Yolo model", args.base_model)
-    neptune_logger.upload_file(Path(splits_path).name, splits_path)
     experiment_id = neptune_logger.get_id()
     neptune_logger.tags("TrainYOLO")
 
