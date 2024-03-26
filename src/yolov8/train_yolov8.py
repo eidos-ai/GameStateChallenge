@@ -1,11 +1,6 @@
 import argparse
 from pathlib import Path
-from ultralytics import YOLO, settings  # type: ignore
-
 from gsr.utils.neptune_logger import NeptuneLogger
-from misc.utils import load_yaml  # type: ignore
-
-settings.update({"neptune": False})
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
