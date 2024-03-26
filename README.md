@@ -31,6 +31,11 @@ unzip gamestate-2024/challenge.zip -d challenge
 cd ../..
 ```
 
+### Dataset reformat into YOLOv8 format
+The dataset is provided in a format that is not compatible with the YOLOv8 model. To reformat the dataset, run the following command:
+
+```python src/yolov8/yolov8_dataset_reformatter.py -rdp data/SoccerNetGS/gamestate-2024 -ydp data/YoloDataset```
+
 At this point:
 - the repository and its submodules were cloned,
 - the virtual environment was created and activated,

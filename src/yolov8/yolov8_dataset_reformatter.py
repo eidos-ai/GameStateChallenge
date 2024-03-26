@@ -1,21 +1,20 @@
 import os
 import json
 import shutil
+import argparse
 
-DIRECTORIES_PATH = "data/SoccerNetGS/gamestate-2024/"
 
-
-def create_yolov8_dataset_folders(folder: str) -> None:
+def create_yolov8_dataset_folders(folder: str, yolo_dataset_path: str) -> None:
     """Create the YOLOv8 dataset folders"""
-    os.makedirs(f"yolov8_dataset/{folder}/images", exist_ok=True)
-    os.makedirs(f"yolov8_dataset/{folder}/labels", exist_ok=True)
-    print("Done: the YOLOv8 dataset folders were successfully created.")
+    os.makedirs(f"{yolo_dataset_path}/{folder}/images", exist_ok=True)
+    os.makedirs(f"{yolo_dataset_path}/{folder}/labels", exist_ok=True)
+    print(f"Done: the YOLOv8 dataset {folder} folders were successfully created.")
 
 
-def format_images(folder: str) -> None:
+def format_images(folder: str, yolo_dataset_path: str, raw_dataset_path: str) -> None:
     if folder == "val":
         folder = "valid"
-    folder_path = os.path.join(DIRECTORIES_PATH, folder)
+    folder_path = os.path.join(raw_dataset_path, folder)
     for root, dirs, files in os.walk(folder_path):
         for document in files:
             if document.endswith(".jpg"):
@@ -31,20 +30,22 @@ def format_images(folder: str) -> None:
                 if folder == "valid":
                     folder = "val"
                 new_image_path = (
-                    "yolov8_dataset/" + folder + "/images/" + new_image_name + ".jpg"
+                    f"{yolo_dataset_path}/{folder}/images/{new_image_name}.jpg"
                 )
                 shutil.copy2(os.path.join(root, document), new_image_path)
     print(
-        f"Done: the images were successfully exported into {folder} folder in YOLOv8 dataset."
+        f"Done: the images were successfully exported into {folder} folder in the YOLO dataset."
     )
 
 
-def create_annotation_txt_file(folder: str) -> None:
+def create_annotation_txt_file(
+    folder: str, yolo_dataset_path: str, raw_dataset_path: str
+) -> None:
     """from Labels-GameState.json, get the annotations of the corresponding image and
     write them to a txt file in YOLOv8 format"""
     if folder == "val":
         folder = "valid"
-    folder_path = os.path.join(DIRECTORIES_PATH, folder)
+    folder_path = os.path.join(raw_dataset_path, folder)
     for root, dirs, files in os.walk(folder_path):
         for document in files:
             if document.endswith("Labels-GameState.json"):
@@ -87,20 +88,37 @@ def create_annotation_txt_file(folder: str) -> None:
                         exit()
                     if folder == "valid":
                         folder = "val"
-                    new_txt_path = (
-                        "yolov8_dataset/" + folder + "/labels/" + new_txt_name
-                    )
+                    new_txt_path = f"{yolo_dataset_path}/{folder}/labels/{new_txt_name}"
                     with open(new_txt_path, "w") as file:
                         for ann in formatted_annotations:
                             file.write(ann + "\n")
     print(
-        f"Done: the labels txt files were successfully exported into {folder} folder in YOLOv8 dataset."
+        f"Done: the labels txt files were successfully exported into {folder} folder in the YOLO dataset."
     )
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="")
+    parser.add_argument(
+        "-rdp",
+        "--raw-dataset-path",
+        type=str,
+        required=True,
+        help="Path of the raw dataset.",
+    )
+    parser.add_argument(
+        "-ydp",
+        "--yolo-dataset-path",
+        type=str,
+        required=True,
+        help="Path of the new YOLOv8 dataset.",
+    )
+    args = parser.parse_args()
+    raw_dataset_path = args.raw_dataset_path
+    yolo_dataset_path = args.yolo_dataset_path
+
     folders = ["train", "test", "val"]
     for folder in folders:
-        create_yolov8_dataset_folders(folder)
-        format_images(folder)
-        create_annotation_txt_file(folder)
+        create_yolov8_dataset_folders(folder, yolo_dataset_path)
+        format_images(folder, yolo_dataset_path, raw_dataset_path)
+        create_annotation_txt_file(folder, yolo_dataset_path, raw_dataset_path)
