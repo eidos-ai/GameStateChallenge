@@ -1,9 +1,7 @@
-train: /home/enzo/GameStateChallenge/data/YoloDataset/train/images
-val: /home/enzo/GameStateChallenge/data/YoloDataset/val/images
-test: /home/enzo/GameStateChallenge/data/YoloDataset/test/images
+train: ./GameStateChallenge/data/YoloDataset/train/images
+test: ./GameStateChallenge/data/YoloDataset/test/images
+val: ./GameStateChallenge/data/YoloDataset/val/images
 
-# number of classes
 nc: 1
 
-# class names
 names: ['person']
