@@ -2,6 +2,13 @@ import os
 import json
 import shutil
 import argparse
+from tqdm import tqdm
+
+YOLO_CLASSES = {"person": 0}
+FRAME_SIZE = {
+    "width": 1920,
+    "height": 1080,
+}
 
 
 def create_yolov8_dataset_folders(folder: str, yolo_dataset_path: str) -> None:
@@ -15,7 +22,7 @@ def format_images(folder: str, yolo_dataset_path: str, raw_dataset_path: str) ->
     if folder == "val":
         folder = "valid"
     folder_path = os.path.join(raw_dataset_path, folder)
-    for root, dirs, files in os.walk(folder_path):
+    for root, dirs, files in tqdm(os.walk(folder_path)):
         for document in files:
             if document.endswith(".jpg"):
                 image_path = os.path.join(root, document)
@@ -46,7 +53,7 @@ def create_annotation_txt_file(
     if folder == "val":
         folder = "valid"
     folder_path = os.path.join(raw_dataset_path, folder)
-    for root, dirs, files in os.walk(folder_path):
+    for root, dirs, files in tqdm(os.walk(folder_path)):
         for document in files:
             if document.endswith("Labels-GameState.json"):
                 with open(os.path.join(root, document)) as json_file:
@@ -64,14 +71,26 @@ def create_annotation_txt_file(
                             or annotation["category_id"] == 3
                         ):
                             formatted_annotation = (
-                                "1 "
-                                + str(annotation["bbox_image"]["x_center"])
+                                f"{YOLO_CLASSES['person']} "
+                                + str(
+                                    (float(annotation["bbox_image"]["x_center"]))
+                                    / FRAME_SIZE["width"]
+                                )
                                 + " "
-                                + str(annotation["bbox_image"]["y_center"])
+                                + str(
+                                    (float(annotation["bbox_image"]["y_center"]))
+                                    / FRAME_SIZE["height"]
+                                )
                                 + " "
-                                + str(annotation["bbox_image"]["w"])
+                                + str(
+                                    (float(annotation["bbox_image"]["w"]))
+                                    / FRAME_SIZE["width"]
+                                )
                                 + " "
-                                + str(annotation["bbox_image"]["h"])
+                                + str(
+                                    (float(annotation["bbox_image"]["h"]))
+                                    / FRAME_SIZE["height"]
+                                )
                             )
                             formatted_annotations.append(formatted_annotation)
                     json_file_path = os.path.join(root, document)
@@ -97,6 +116,20 @@ def create_annotation_txt_file(
     )
 
 
+def create_yolov8_yaml_file(
+    yolo_dataset_path: str, yaml_file_path, folders: list[str]
+) -> None:
+    """Create the YOLOv8 yaml file"""
+    with open(yaml_file_path, "w") as file:
+        for folder in folders:
+            file.write(
+                f"{folder}: ./GameStateChallenge/{yolo_dataset_path}/{folder}/images\n"
+            )
+        file.write(f"\nnc: {len(YOLO_CLASSES)}\n")
+        file.write(f"\nnames: {list(YOLO_CLASSES.keys())}\n")
+    print(f"Done: the YOLOv8 yaml file was successfully created.")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument(
@@ -113,12 +146,21 @@ if __name__ == "__main__":
         required=True,
         help="Path of the new YOLOv8 dataset.",
     )
+    parser.add_argument(
+        "-yaml",
+        "--yaml-file-path",
+        type=str,
+        required=True,
+        help="Path of the YOLOv8 yaml file.",
+    )
     args = parser.parse_args()
     raw_dataset_path = args.raw_dataset_path
     yolo_dataset_path = args.yolo_dataset_path
+    yaml_file_path = args.yaml_file_path
 
     folders = ["train", "test", "val"]
+    create_yolov8_yaml_file(yolo_dataset_path, yaml_file_path, folders)
     for folder in folders:
-        create_yolov8_dataset_folders(folder, yolo_dataset_path)
-        format_images(folder, yolo_dataset_path, raw_dataset_path)
+        # create_yolov8_dataset_folders(folder, yolo_dataset_path)
+        # format_images(folder, yolo_dataset_path, raw_dataset_path)
         create_annotation_txt_file(folder, yolo_dataset_path, raw_dataset_path)
