@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+from ultralytics import YOLO  # type: ignore
 from gsr.utils.neptune_logger import NeptuneLogger
 
 if __name__ == "__main__":
