@@ -35,6 +35,10 @@ cd ../..
 The dataset is provided in a format that is not compatible with the YOLOv8 model. To reformat the dataset, run the following command:
 
 ```python src/yolov8/yolov8_dataset_reformatter.py -rdp data/SoccerNetGS -ydp data/YoloDataset```
+```python src/yolov8/yolov8_dataset_reformatter.py -rdp data/SoccerNetGS -ydp data/YoloDataset -yaml src/yolov8/YOLO_FILE_NAME.yaml```
+
+**Note:** replace `YOLO_FILE_NAME` with the name of the YOLO file you want to use (e.g. yolo_config).
+
 
 At this point:
 - the repository and its submodules were cloned,
