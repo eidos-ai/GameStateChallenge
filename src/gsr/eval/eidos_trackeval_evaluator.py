@@ -8,9 +8,9 @@ from tabulate import tabulate  # type: ignore
 from tracklab.core import Evaluator as EvaluatorBase  # type: ignore
 from gsr.utils.neptune_logger import NeptuneLogger
 from typing import Union
-from omegaconf import OmegaConf  # type: ignore
-from tracklab.tracklab.wrappers.datasets.soccernet.soccernet_game_state import SoccerNetGameState  # type: ignore
-from tracklab.tracklab.datastruct.tracker_state import TrackerState  # type: ignore
+from omegaconf import DictConfig  # type: ignore
+from tracklab.wrappers.datasets.soccernet.soccernet_game_state import SoccerNetGameState  # type: ignore
+from tracklab.datastruct.tracker_state import TrackerState  # type: ignore
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s")
 log = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
 
     def __init__(
         self,
-        cfg: OmegaConf.dictconfig.DictConfig[Any, Any],
+        cfg: DictConfig,
         eval_set: str,
         show_progressbar: bool,
         dataset_path: str,
