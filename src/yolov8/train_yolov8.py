@@ -77,11 +77,16 @@ if __name__ == "__main__":
         if args.name
         else f"{args.base_model}_{args.epochs}_{args.eval_conf_th}"
     )
+    
+    # dataset path
+    yaml_path = args.yaml
+    dataset_path = "/".join(yaml_path.split("/")[:-1])
 
     # Add training parameters to neptune
     neptune_logger = NeptuneLogger(
         enable_run=args.neptune, project=args.project, run_name_or_id=name
     )
+    neptune_logger.param("dataset path", dataset_path)
     neptune_logger.param("epochs", args.epochs)
     neptune_logger.param("Eval conf th", args.eval_conf_th)
     neptune_logger.param("batch size", args.batch_size)
