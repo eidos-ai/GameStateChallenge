@@ -157,11 +157,11 @@ class SoccerNetGS:
                     frame, starting_point_jersey, ending_point_jersey, color, -1
                 )
                 # jersey number rectangle text
-                jersey_text = "JN: "
+                JN = "-"
+                track_id = item["track_id"]
+                jersey_text = f"JN: {JN}, ID: {track_id}"
                 if item["attributes"]["jersey"] is not None:
-                    jersey_text += item["attributes"]["jersey"]
-                else:
-                    jersey_text += "-"
+                    JN = item["attributes"]["jersey"]
                 cv.putText(
                     frame,
                     jersey_text,
@@ -252,6 +252,7 @@ class SoccerNetGS:
         if minimap_render:
             frame = self.render_minimap(frame, object_annotations)
         frame_rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+        plt.figure(dpi=300)  # Increase DPI for better quality
         plt.imshow(frame_rgb)
         plt.show()
 
