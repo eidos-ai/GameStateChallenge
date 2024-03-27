@@ -2,7 +2,7 @@ import os
 import json
 import shutil
 import argparse
-from tqdm import tqdm
+from tqdm import tqdm  # type: ignore
 
 YOLO_CLASSES = {"person": 0}
 FRAME_SIZE = {
@@ -117,7 +117,7 @@ def create_annotation_txt_file(
 
 
 def create_yolov8_yaml_file(
-    yolo_dataset_path: str, yaml_file_path, folders: list[str]
+    yolo_dataset_path: str, yaml_file_path: str, folders: list[str]
 ) -> None:
     """Create the YOLOv8 yaml file"""
     with open(yaml_file_path, "w") as file:
