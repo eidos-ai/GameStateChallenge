@@ -96,10 +96,8 @@ if __name__ == "__main__":
         batch=args.batch_size,
         name=experiment_id,
         project=str(experiments_dir),
-        mosaic=False,
-        fliplr=0.0,
     )  # train the model
-    results_path = Path("experiments", experiment_id)
+    results_path = Path(experiments_dir, experiment_id)
 
     # Upload confusion matrix and other files
     images_names = [
