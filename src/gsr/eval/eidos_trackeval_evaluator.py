@@ -1,13 +1,14 @@
 import numpy as np  # type: ignore
 import trackeval  # type: ignore
 import logging
-import sys
-from typing import Any
+import yaml
+import os
+from typing import Any, Union
 from pathlib import Path
 from tabulate import tabulate  # type: ignore
 from tracklab.core import Evaluator as EvaluatorBase  # type: ignore
 from gsr.utils.neptune_logger import NeptuneLogger
-from typing import Union
+
 from omegaconf import DictConfig  # type: ignore
 from tracklab.wrappers.datasets.soccernet.soccernet_game_state import SoccerNetGameState  # type: ignore
 from tracklab.datastruct.tracker_state import TrackerState  # type: ignore
@@ -151,11 +152,29 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
             results = self.tracking_dataset.process_trackeval_results(
                 results, dataset_config, eval_config
             )
+
+        # Open the config file
+        config_file_path = "src/gsr/configs/eidos_soccernet_eval.yaml"
+        with open(config_file_path, "r") as file:
+            config_data = yaml.safe_load(file)
+
+        # Get the values of nvid and eval_set
+        nvid = config_data["nvid"]
+        eval_set = config_data["eval_set"]
+        folder_path = f"data/SoccerNetGS/gamestate-2024/{eval_set}"
+        if nvid == -1:
+            nvid = len(os.listdir(folder_path))
+        videos_names = os.listdir(folder_path)[:nvid]
+
         if self.cfg.neptune:
             self.neptune_logger.log("GS-HOTA", results["GS-HOTA"]["GS-HOTA"])
             self.neptune_logger.log("DetA", results["GS-HOTA"]["DetA"])
             self.neptune_logger.log("LocA", results["GS-HOTA"]["LocA"])
             self.neptune_logger.log("AssA", results["GS-HOTA"]["AssA"])
+            self.neptune_logger.log("nvid", results["GS-HOTA"]["DetRe"])
+            self.neptune_logger.log("eval_set", eval_set)
+            self.neptune_logger.log("nvid", nvid)
+            self.neptune_logger.log("evaluated_videos", videos_names)
 
 
 def _print_results(

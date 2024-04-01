@@ -123,10 +123,6 @@ if __name__ == "__main__":
     )  # train the model
     results_path = Path(experiments_dir, experiment_id)
 
-    print("---------------------")
-    print(loss)
-    print("---------------------")
-
     # Upload confusion matrix and other files
     images_names = [
         "confusion_matrix.png",
