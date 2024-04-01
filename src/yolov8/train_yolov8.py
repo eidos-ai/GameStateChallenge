@@ -65,6 +65,21 @@ if __name__ == "__main__":
         default="eidos/GameStateChallenge",
         help="The name of the project",
     )
+    parser.add_argument(
+        "--initial-learning-rate",
+        required=False,
+        type=float,
+        default=0.01,
+        help="The initial learning rate of the model",
+    )
+    parser.add_argument(
+        "--final-learning-rate",
+        required=False,
+        type=float,
+        default=0.01,
+        help="The final learning rate of the model",
+    )
+
     args = parser.parse_args()
 
     experiments_dir = Path(args.experiments)
@@ -77,7 +92,7 @@ if __name__ == "__main__":
         if args.name
         else f"{args.base_model}_{args.epochs}_{args.eval_conf_th}"
     )
-    
+
     # dataset path
     yaml_path = args.yaml
     dataset_path = "/".join(yaml_path.split("/")[:-1])
@@ -91,18 +106,26 @@ if __name__ == "__main__":
     neptune_logger.param("Eval conf th", args.eval_conf_th)
     neptune_logger.param("batch size", args.batch_size)
     neptune_logger.param("Yolo model", args.base_model)
+    neptune_logger.param("lr0", args.initial_learning_rate)
+    neptune_logger.param("lrf", args.final_learning_rate)
     experiment_id = neptune_logger.get_id()
     neptune_logger.tags("TrainYOLO")
 
     # Start training
-    model.train(
+    loss = model.train(
         data=args.yaml,
         epochs=args.epochs,
         batch=args.batch_size,
         name=experiment_id,
         project=str(experiments_dir),
+        lr0=args.initial_learning_rate,
+        lrf=args.final_learning_rate,
     )  # train the model
     results_path = Path(experiments_dir, experiment_id)
+
+    print("---------------------")
+    print(loss)
+    print("---------------------")
 
     # Upload confusion matrix and other files
     images_names = [
