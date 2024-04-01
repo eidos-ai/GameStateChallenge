@@ -1,7 +1,7 @@
 import numpy as np  # type: ignore
 import trackeval  # type: ignore
 import logging
-import yaml
+import yaml  # type: ignore
 import os
 from typing import Any, Union
 from pathlib import Path
@@ -152,7 +152,7 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
             results = self.tracking_dataset.process_trackeval_results(
                 results, dataset_config, eval_config
             )
-        
+
         # Get the values of eval_set, nvid and videos_names
         config_file_path = "../../../../src/gsr/configs/eidos_soccernet_eval.yaml"
         with open(config_file_path, "r") as file:
