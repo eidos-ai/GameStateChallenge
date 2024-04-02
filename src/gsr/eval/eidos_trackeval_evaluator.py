@@ -159,14 +159,21 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
             config_data = yaml.safe_load(file)
         nvid = config_data["dataset"]["nvid"]
         eval_set = config_data["dataset"]["eval_set"]
+        valid_list = config_data["dataset"]["vids_dict"]["valid"]
         folder_path = f"../../../../data/SoccerNetGS/{eval_set}"
+
+        if len(valid_list) > 0:
+            total_videos = valid_list
+            nvid = len(total_videos)
+        else:
+            total_videos = os.listdir(folder_path)
+            total_videos.sort()
+        videos_names = total_videos[:nvid]
+
         if nvid == -1:
             nvid = (
                 len(os.listdir(folder_path)) - 1
             )  # -1 is because of sequences_info.json
-        total_videos = os.listdir(folder_path)
-        total_videos.sort()
-        videos_names = total_videos[:nvid]
         nvid = str(nvid)
 
         if self.cfg.neptune:
