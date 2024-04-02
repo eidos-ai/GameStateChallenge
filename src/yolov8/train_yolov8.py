@@ -2,7 +2,8 @@ import argparse
 from pathlib import Path
 from ultralytics import YOLO  # type: ignore
 from gsr.utils.neptune_logger import NeptuneLogger
-from ultralytics.utils import SETTINGS
+from ultralytics.utils import SETTINGS  # type: ignore
+
 SETTINGS["neptune"] = False
 SETTINGS["wandb"] = False
 
