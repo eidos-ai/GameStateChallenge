@@ -112,7 +112,7 @@ if __name__ == "__main__":
     neptune_logger.tags("TrainYOLO")
 
     # Start training
-    loss = model.train(
+    model.train(
         data=args.yaml,
         epochs=args.epochs,
         batch=args.batch_size,

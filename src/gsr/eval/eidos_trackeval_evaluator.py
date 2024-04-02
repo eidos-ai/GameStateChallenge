@@ -161,7 +161,7 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
         eval_set = config_data["dataset"]["eval_set"]
         folder_path = f"../../../../data/SoccerNetGS/{eval_set}"
         if nvid == -1:
-            nvid = len(os.listdir(folder_path))
+            nvid = len(os.listdir(folder_path)) -1 # -1 is because of sequences_info.json
         total_videos = os.listdir(folder_path)
         total_videos.sort()
         videos_names = total_videos[:nvid]
