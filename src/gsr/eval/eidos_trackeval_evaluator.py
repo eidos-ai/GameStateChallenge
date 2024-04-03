@@ -169,8 +169,8 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
             self.neptune_logger.log("nvid", nvid)
             self.neptune_logger.log("evaluated_videos", str(videos_names))
             self.neptune_logger.tags("Eval GameState")
-            
-             
+
+
 def _print_results(
     res_combined: dict[str, Any],
     res_by_video: dict[str, Any] | None = None,
