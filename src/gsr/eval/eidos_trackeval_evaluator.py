@@ -153,40 +153,24 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
                 results, dataset_config, eval_config
             )
 
-        # Get the values of eval_set, nvid and videos_names
-        config_file_path = "../../../../src/gsr/configs/eidos_soccernet_eval.yaml"
-        with open(config_file_path, "r") as file:
-            config_data = yaml.safe_load(file)
-        nvid = config_data["dataset"]["nvid"]
-        eval_set = config_data["dataset"]["eval_set"]
-        valid_list = config_data["dataset"]["vids_dict"]["valid"]
-        folder_path = f"../../../../data/SoccerNetGS/{eval_set}"
-
-        if len(valid_list) > 0:
-            total_videos = valid_list
-            nvid = len(total_videos)
-        else:
-            total_videos = os.listdir(folder_path)
-            total_videos.sort()
-        videos_names = total_videos[:nvid]
-
-        if nvid == -1:
-            nvid = (
-                len(os.listdir(folder_path)) - 1
-            )  # -1 is because of sequences_info.json
-        nvid = str(nvid)
+        videos_names = []
+        for video in tracker_state.video_metadatas["name"]:
+            videos_names.append(video)
+        nvid = len(videos_names)
+        eval_set = self.eval_set.split(" ")[0]
 
         if self.cfg.neptune:
-            self.neptune_logger.log("GS-HOTA", results["GS-HOTA"]["GS-HOTA"])
-            self.neptune_logger.log("DetA", results["GS-HOTA"]["DetA"])
-            self.neptune_logger.log("LocA", results["GS-HOTA"]["LocA"])
-            self.neptune_logger.log("AssA", results["GS-HOTA"]["AssA"])
-            self.neptune_logger.log("nvid", results["GS-HOTA"]["DetRe"])
+            self.neptune_logger.log("GS-HOTA", float(results["GS-HOTA"]["GS-HOTA"]))
+            self.neptune_logger.log("DetA", float(results["GS-HOTA"]["DetA"]))
+            self.neptune_logger.log("LocA", float(results["GS-HOTA"]["LocA"]))
+            self.neptune_logger.log("AssA", float(results["GS-HOTA"]["AssA"]))
+            self.neptune_logger.log("DetRe", float(results["GS-HOTA"]["DetRe"]))
             self.neptune_logger.log("eval_set", eval_set)
             self.neptune_logger.log("nvid", nvid)
-            self.neptune_logger.log("evaluated_videos", videos_names)
-
-
+            self.neptune_logger.log("evaluated_videos", str(videos_names))
+            self.neptune_logger.tags("Eval GameState")
+            
+             
 def _print_results(
     res_combined: dict[str, Any],
     res_by_video: dict[str, Any] | None = None,

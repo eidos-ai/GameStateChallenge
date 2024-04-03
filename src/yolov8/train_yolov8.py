@@ -2,11 +2,12 @@ import argparse
 from pathlib import Path
 from ultralytics import YOLO  # type: ignore
 from gsr.utils.neptune_logger import NeptuneLogger
-from ultralytics.utils import SETTINGS  # type: ignore
+# from ultralytics import settings  # type: ignore
 
-SETTINGS["neptune"] = False
-SETTINGS["wandb"] = False
-
+# settings.update({'neptune': False})
+# settings.update({'wandb': False})
+                
+                
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
