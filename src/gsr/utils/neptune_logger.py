@@ -2,6 +2,7 @@ from typing import Any
 import neptune  # type: ignore
 import uuid
 import os
+from pathlib import Path
 
 
 class NeptuneLogger:
@@ -37,7 +38,7 @@ class NeptuneLogger:
         if self.enable_run:
             self.neptune_run[name] = value
 
-    def tags(self, tags_list: list[str]) -> None:
+    def tags(self, tags_list: list[str] | str) -> None:
         if self.enable_run:
             self.neptune_run["sys/tags"].add(tags_list)
 
@@ -53,7 +54,7 @@ class NeptuneLogger:
     #     if self.enable_run:
     #         self.neptune_run[name].upload(neptune.types.File.as_html(df))
 
-    def upload_file(self, name: str, path: str) -> None:
+    def upload_file(self, name: str, path: Path) -> None:
         if self.enable_run:
             self.neptune_run[name].upload(str(path))
 

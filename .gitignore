@@ -5,7 +5,7 @@ env
 .ipynb_checkpoints
 .mypy_cache
 
-# Data folder
+# Data folders
 data/
 
 # Python cache folder

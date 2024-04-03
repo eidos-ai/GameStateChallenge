@@ -1,16 +1,17 @@
 import numpy as np  # type: ignore
 import trackeval  # type: ignore
 import logging
-import sys
-from typing import Any
+import yaml  # type: ignore
+import os
+from typing import Any, Union
 from pathlib import Path
 from tabulate import tabulate  # type: ignore
 from tracklab.core import Evaluator as EvaluatorBase  # type: ignore
 from gsr.utils.neptune_logger import NeptuneLogger
-from typing import Union
-from omegaconf import OmegaConf  # type: ignore
-from tracklab.tracklab.wrappers.datasets.soccernet.soccernet_game_state import SoccerNetGameState  # type: ignore
-from tracklab.tracklab.datastruct.tracker_state import TrackerState  # type: ignore
+
+from omegaconf import DictConfig  # type: ignore
+from tracklab.wrappers.datasets.soccernet.soccernet_game_state import SoccerNetGameState  # type: ignore
+from tracklab.datastruct.tracker_state import TrackerState  # type: ignore
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s")
 log = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
 
     def __init__(
         self,
-        cfg: OmegaConf.dictconfig.DictConfig[Any, Any],
+        cfg: DictConfig,
         eval_set: str,
         show_progressbar: bool,
         dataset_path: str,
@@ -151,11 +152,23 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
             results = self.tracking_dataset.process_trackeval_results(
                 results, dataset_config, eval_config
             )
+
+        videos_names = []
+        for video in tracker_state.video_metadatas["name"]:
+            videos_names.append(video)
+        nvid = len(videos_names)
+        eval_set = self.eval_set.split(" ")[0]
+
         if self.cfg.neptune:
-            self.neptune_logger.log("GS-HOTA", results["GS-HOTA"]["GS-HOTA"])
-            self.neptune_logger.log("DetA", results["GS-HOTA"]["DetA"])
-            self.neptune_logger.log("LocA", results["GS-HOTA"]["LocA"])
-            self.neptune_logger.log("AssA", results["GS-HOTA"]["AssA"])
+            self.neptune_logger.log("GS-HOTA", float(results["GS-HOTA"]["GS-HOTA"]))
+            self.neptune_logger.log("DetA", float(results["GS-HOTA"]["DetA"]))
+            self.neptune_logger.log("LocA", float(results["GS-HOTA"]["LocA"]))
+            self.neptune_logger.log("AssA", float(results["GS-HOTA"]["AssA"]))
+            self.neptune_logger.log("DetRe", float(results["GS-HOTA"]["DetRe"]))
+            self.neptune_logger.log("eval_set", eval_set)
+            self.neptune_logger.log("nvid", nvid)
+            self.neptune_logger.log("evaluated_videos", str(videos_names))
+            self.neptune_logger.tags("Eval GameState")
 
 
 def _print_results(
