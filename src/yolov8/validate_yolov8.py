@@ -10,8 +10,7 @@ if __name__ == "__main__":
         "-m",
         "--base_model",
         required=True,
-        default="GameStateChallenge/pretrained_models/yolo/yolov8x6.pt",
-        help="The base yolo model to use for training. Default value is the baseline model",
+        help="The base yolo model to use for training.",
     )
     parser.add_argument(
         "-y",
@@ -82,18 +81,41 @@ if __name__ == "__main__":
     neptune_logger.param("batch size", args.batch_size)
     neptune_logger.param("Yolo model", args.base_model)
     experiment_id = neptune_logger.get_id()
-    neptune_logger.tags("Eval GameState")
+    neptune_logger.tags("ValYOLO")
+
+    results_path = Path(experiments_dir, experiment_id)
 
     # Validate the model
-    validation_results = model.val(
+    val_metrics = model.val(
         data=args.yaml,
         batch=args.batch_size,
         conf=args.eval_conf_th,
+        project=str(results_path)
     )
-    results_path = Path(experiments_dir, experiment_id)
-
-    print("-------------------")
-    print(validation_results)
-    print("-------------------")
+    
+    results_path = results_path.joinpath("val")
+    
+    images_names = [
+        "P_curve.png",
+        "PR_curve.png",
+        "R_curve.png",
+    ]
+    
+    for im_name in images_names:
+        im_path = results_path.joinpath(im_name)
+        neptune_logger.upload_file(im_name, im_path)
+    
+    # Precision and Recall
+    conf_matrix = val_metrics.confusion_matrix.matrix
+    for class_idx, class_name in val_metrics.names.items():
+        if class_name == "person":
+            class_P = conf_matrix[class_idx, class_idx] / conf_matrix[class_idx, :].sum()
+            class_R = conf_matrix[class_idx, class_idx] / conf_matrix[:, class_idx].sum()
+            neptune_logger.log(f"{class_name} Precision", round(class_P, 2))
+            neptune_logger.log(f"{class_name} Recall", round(class_R, 2))
+            
+    # Other metrics
+    for metric_name, metric_value in val_metrics.results_dict.items():
+        neptune_logger.log(metric_name, metric_value)
 
     neptune_logger.stop()
