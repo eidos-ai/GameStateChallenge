@@ -11,7 +11,7 @@ defaults:
   - engine: offline
   - state: save  # Dump tracking results to a .pcklz file to save computation time on the next run. Have a look at TrackLab tutorials for more details.
   - visualization: gamestate  # Save tracking results as a .mp4 video in the run directory specified below (sn-gamestate/outputs/...)
-  - modules/bbox_detector: yolov8
+  - modules/bbox_detector: custom_yolov8
   - modules/reid: prtreid
   - modules/track: oc_sort
   - modules/jersey_number_detect: mmocr
@@ -45,10 +45,12 @@ experiment_name: "sn-gamestate"
 home_dir: "${oc.env:HOME}"
 data_dir: "${project_dir}/data"
 model_dir: "${project_dir}/pretrained_models"
+yolo_models_dir: "${project_dir}/experiments/yolov8"
 
 # Machine configuration
 num_cores: 4
 use_wandb: False
+use_neptune: True
 use_rich: True
 
 modules: # Allows module-specific batch_size and other configuration
