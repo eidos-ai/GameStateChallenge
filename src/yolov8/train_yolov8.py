@@ -2,11 +2,76 @@ import argparse
 from pathlib import Path
 from ultralytics import YOLO  # type: ignore
 from gsr.utils.neptune_logger import NeptuneLogger
+from validate_yolov8 import ValidateYOLO
 
-# from ultralytics import settings  # type: ignore
 
-# settings.update({'neptune': False})
-# settings.update({'wandb': False})
+class TrainYOLO:
+    def __init__(self, args):
+        self.args = args
+
+    def train(self):
+        experiments_dir = Path(args.experiments)
+
+        # Load base model
+        model = YOLO(
+            args.base_model
+        )  # load a pretrained model (recommended for training)
+
+        name = (
+            args.name
+            if args.name
+            else f"{args.base_model}_{args.epochs}_{args.eval_conf_th}"
+        )
+
+        # dataset path
+        yaml_path = args.yaml
+        dataset_path = "/".join(yaml_path.split("/")[:-1])
+
+        # Add training parameters to neptune
+        neptune_logger = NeptuneLogger(
+            enable_run=args.neptune, project=args.project, run_name_or_id=name
+        )
+        neptune_logger.param("dataset path", dataset_path)
+        neptune_logger.param("epochs", args.epochs)
+        neptune_logger.param("Eval conf th", args.eval_conf_th)
+        neptune_logger.param("batch size", args.batch_size)
+        neptune_logger.param("Yolo model", args.base_model)
+        neptune_logger.param("lr0", args.initial_learning_rate)
+        neptune_logger.param("lrf", args.final_learning_rate)
+        experiment_id = neptune_logger.get_id()
+        neptune_logger.tags("TrainYOLO")
+
+        # Start training
+        model.train(
+            data=args.yaml,
+            epochs=args.epochs,
+            batch=args.batch_size,
+            name=experiment_id,
+            project=str(experiments_dir),
+            lr0=args.initial_learning_rate,
+            lrf=args.final_learning_rate,
+        )  # train the model
+        results_path = Path(experiments_dir, experiment_id)
+
+        # Upload confusion matrix and other files
+        images_names = [
+            "confusion_matrix.png",
+            "F1_curve.png",
+            "labels.jpg",
+            "P_curve.png",
+            "PR_curve.png",
+            "R_curve.png",
+            "results.png",
+        ]
+        for im_name in images_names:
+            im_path = results_path.joinpath(im_name)
+            neptune_logger.upload_file(im_name, im_path)
+
+        # Perfom evaluation on validation dataset
+        # val = ValidateYOLO(args)
+        # val.validate()
+
+        neptune_logger.stop()
 
 
 if __name__ == "__main__":
@@ -144,17 +209,7 @@ if __name__ == "__main__":
         neptune_logger.upload_file(im_name, im_path)
 
     # Perfom evaluation on validation dataset
-    val_output_path = results_path.joinpath("eval")
-    val_metrics = model.val(conf=args.eval_conf_th, project=results_path, name="eval")
-    conf_matrix = val_metrics.confusion_matrix.matrix
-    for class_idx, class_name in val_metrics.names.items():
-        class_P = conf_matrix[class_idx, class_idx] / conf_matrix[class_idx, :].sum()
-        class_R = conf_matrix[class_idx, class_idx] / conf_matrix[:, class_idx].sum()
-        neptune_logger.log(f"{class_name} Precision", round(class_P, 2))
-        neptune_logger.log(f"{class_name} Recall", round(class_R, 2))
-    for metric_name, metric_value in val_metrics.results_dict.items():
-        neptune_logger.log(metric_name, metric_value)
-    neptune_logger.upload_file(
-        "confusion_matrix_eval.png", val_output_path.joinpath("confusion_matrix.png")
-    )
+    val = ValidateYOLO(args)
+    val.validate()
+
     neptune_logger.stop()
