@@ -48,6 +48,7 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
             project="eidos/GameStateChallenge",
             run_name_or_id="GAM-OBJ",
         )
+        self.neptune_logger.tags("Eval GameState")
 
     def run(self, tracker_state: TrackerState) -> None:
         log.info(
@@ -168,7 +169,6 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
             self.neptune_logger.log("eval_set", eval_set)
             self.neptune_logger.log("nvid", nvid)
             self.neptune_logger.log("evaluated_videos", str(videos_names))
-            self.neptune_logger.tags("Eval GameState")
 
 
 def _print_results(
