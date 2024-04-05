@@ -90,30 +90,34 @@ if __name__ == "__main__":
         data=args.yaml,
         batch=args.batch_size,
         conf=args.eval_conf_th,
-        project=str(results_path)
+        project=str(results_path),
     )
-    
+
     results_path = results_path.joinpath("val")
-    
+
     images_names = [
         "P_curve.png",
         "PR_curve.png",
         "R_curve.png",
     ]
-    
+
     for im_name in images_names:
         im_path = results_path.joinpath(im_name)
         neptune_logger.upload_file(im_name, im_path)
-    
+
     # Precision and Recall
     conf_matrix = val_metrics.confusion_matrix.matrix
     for class_idx, class_name in val_metrics.names.items():
         if class_name == "person":
-            class_P = conf_matrix[class_idx, class_idx] / conf_matrix[class_idx, :].sum()
-            class_R = conf_matrix[class_idx, class_idx] / conf_matrix[:, class_idx].sum()
+            class_P = (
+                conf_matrix[class_idx, class_idx] / conf_matrix[class_idx, :].sum()
+            )
+            class_R = (
+                conf_matrix[class_idx, class_idx] / conf_matrix[:, class_idx].sum()
+            )
             neptune_logger.log(f"{class_name} Precision", round(class_P, 2))
             neptune_logger.log(f"{class_name} Recall", round(class_R, 2))
-            
+
     # Other metrics
     for metric_name, metric_value in val_metrics.results_dict.items():
         neptune_logger.log(metric_name, metric_value)
