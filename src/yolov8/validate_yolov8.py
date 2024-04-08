@@ -1,11 +1,22 @@
 import argparse
 from pathlib import Path
 from ultralytics import YOLO  # type: ignore
-from gsr.utils.neptune_logger import NeptuneLogger  # type: ignore
+from gsr.utils.neptune_logger import NeptuneLogger
 
 
 class ValidateYOLO:
-    def __init__(self, base_model: str, experiments: str, name: str, eval_conf_th: float, yaml: str, project: str, neptune: bool, batch_size: int, neptune_logger: NeptuneLogger=None) -> None:
+    def __init__(
+        self,
+        base_model: str,
+        experiments: str,
+        name: str,
+        eval_conf_th: float,
+        yaml: str,
+        project: str,
+        neptune: bool,
+        batch_size: int,
+        neptune_logger: NeptuneLogger = None,
+    ) -> None:
         self.experiments = experiments
         self.base_model = base_model
         self.name = name
@@ -15,7 +26,6 @@ class ValidateYOLO:
         self.neptune = neptune
         self.batch_size = batch_size
         self.neptune_logger = neptune_logger
-        
 
     def validate(self) -> None:
         experiments_dir = Path(self.experiments)
@@ -24,11 +34,7 @@ class ValidateYOLO:
         model = YOLO(self.base_model)
 
         # Set experiment name
-        name = (
-            self.name
-            if self.name
-            else f"{self.base_model}_{self.eval_conf_th}"
-        )
+        name = self.name if self.name else f"{self.base_model}_{self.eval_conf_th}"
 
         # Set dataset path
         dataset_path = "/".join(self.yaml.split("/")[:-1])
@@ -41,10 +47,10 @@ class ValidateYOLO:
         self.neptune_logger.param("conf", self.eval_conf_th)
         self.neptune_logger.param("batch size", self.batch_size)
         self.neptune_logger.param("Yolo model", self.base_model)
-        self.experiment_id = neptune_logger.get_id()
+        self.experiment_id = self.neptune_logger.get_id()
         self.neptune_logger.tags("ValYOLO")
 
-        results_path = Path(experiments_dir, experiment_id)
+        results_path = Path(experiments_dir, self.experiment_id)
 
         # Validate the model
         val_metrics = model.val(
@@ -141,6 +147,15 @@ if __name__ == "__main__":
         help="The name of the project",
     )
 
-    args = parser.parse_args()    
-    validate_yolo = ValidateYOLO(args.base_model, args.experiments, args.name, args.eval_conf_th, args.yaml, args.project, args.neptune, args.batch_size)
+    args = parser.parse_args()
+    validate_yolo = ValidateYOLO(
+        args.base_model,
+        args.experiments,
+        args.name,
+        args.eval_conf_th,
+        args.yaml,
+        args.project,
+        args.neptune,
+        args.batch_size,
+    )
     validate_yolo.validate()

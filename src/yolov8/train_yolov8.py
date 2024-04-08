@@ -2,11 +2,24 @@ import argparse
 from pathlib import Path
 from ultralytics import YOLO  # type: ignore
 from gsr.utils.neptune_logger import NeptuneLogger
-from validate_yolov8 import ValidateYOLO
+from validate_yolov8 import ValidateYOLO  # type: ignore
 
 
 class TrainYOLO:
-    def __init__(self, base_model: str, experiments: str, name: str, eval_conf_th: float, yaml: str, project: str, neptune: bool, batch_size: int, epochs: int, initial_learning_rate: float, final_learning_rate: float):
+    def __init__(
+        self,
+        base_model: str,
+        experiments: str,
+        name: str,
+        eval_conf_th: float,
+        yaml: str,
+        project: str,
+        neptune: bool,
+        batch_size: int,
+        epochs: int,
+        initial_learning_rate: float,
+        final_learning_rate: float,
+    ) -> None:
         self.base_model = base_model
         self.experiments = experiments
         self.name = name
@@ -18,9 +31,8 @@ class TrainYOLO:
         self.epochs = epochs
         self.initial_learning_rate = initial_learning_rate
         self.final_learning_rate = final_learning_rate
-                
 
-    def train(self):
+    def train(self) -> None:
         experiments_dir = Path(self.experiments)
 
         # Load base model
@@ -77,8 +89,18 @@ class TrainYOLO:
             im_path = results_path.joinpath(im_name)
             neptune_logger.upload_file(im_name, im_path)
 
-        # Perfom evaluation on validation dataset        
-        validate_yolo = ValidateYOLO(self.base_model, self.experiments, self.name, self.eval_conf_th, self.yaml, self.project, self.neptune, self.batch_size, neptune_logger)
+        # Perfom evaluation on validation dataset
+        validate_yolo = ValidateYOLO(
+            self.base_model,
+            self.experiments,
+            self.name,
+            self.eval_conf_th,
+            self.yaml,
+            self.project,
+            self.neptune,
+            self.batch_size,
+            neptune_logger,
+        )
         validate_yolo.validate()
 
         # Stop NeptuneLogger instance
@@ -163,6 +185,18 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    
-    training = TrainYOLO(args.base_model, args.experiments, args.name, args.eval_conf_th, args.yaml, args.project, args.neptune, args.batch_size, args.epochs, args.initial_learning_rate, args.final_learning_rate)
+
+    training = TrainYOLO(
+        args.base_model,
+        args.experiments,
+        args.name,
+        args.eval_conf_th,
+        args.yaml,
+        args.project,
+        args.neptune,
+        args.batch_size,
+        args.epochs,
+        args.initial_learning_rate,
+        args.final_learning_rate,
+    )
     training.train()
