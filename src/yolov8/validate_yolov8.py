@@ -36,7 +36,7 @@ class ValidateYOLO:
         # Set experiment name
         model_name = self.base_model.split("/")[-1:][0]
         name = self.name if self.name else f"{model_name}_{self.eval_conf_th}"
-                
+
         # Set dataset path
         dataset_path = "/".join(self.yaml.split("/")[:-1])
 
