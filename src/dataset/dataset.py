@@ -33,19 +33,28 @@ class SoccerNetGSDataset(Dataset):
                         labels_list.append(
                             {
                                 "video": video,
-                                "image": annotation["image_id"][-3:],
+                                "image": annotation["image_id"][-6:],
                                 "role": annotation["attributes"]["role"],
+                                "label_id": annotation["id"],
+                                "track_id": annotation["track_id"],
+                                "bbox": {
+                                    "x": annotation["bbox_image"]["x"],
+                                    "y": annotation["bbox_image"]["y"],
+                                    "w": annotation["bbox_image"]["w"],
+                                    "h": annotation["bbox_image"]["h"],
+                                },
+                                "crop_img": None,
                             }
                         )
         self.labels = pd.DataFrame(labels_list)
-        print(self.labels.info())
 
     def __len__(self) -> int:
         return len(self.labels)
 
     def __getitem__(self, idx) -> tuple:
-        image = read_image(self.img_path)
-        label = self.img_labels.iloc[idx, 1]
+        label = self.labels.iloc[idx]
+        img_path = f"{self.videos_directory_path}/{label.video}/img1/{label.image}.jpg"
+        image = read_image(img_path)
         if self.transform:
             image = self.transform(image)
         if self.target_transform:
@@ -55,7 +64,5 @@ class SoccerNetGSDataset(Dataset):
 
 if __name__ == "__main__":
     dataset = SoccerNetGSDataset("train")
-    print(dataset.labels.info())
-    print(dataset.labels.head())
     print(dataset.__len__())
-    # print(dataset.__getitem__(0))
+    print(dataset.__getitem__(0))
