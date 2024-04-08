@@ -1,48 +1,56 @@
 import argparse
 from pathlib import Path
 from ultralytics import YOLO  # type: ignore
-from gsr.utils.neptune_logger import NeptuneLogger
+from gsr.utils.neptune_logger import NeptuneLogger  # type: ignore
 
 
 class ValidateYOLO:
-    def __init__(self, args):
-        self.args = args
+    def __init__(self, base_model: str, experiments: str, name: str, eval_conf_th: float, yaml: str, project: str, neptune: bool, neptune_logger: NeptuneLogger=None, batch_size: int) -> None:
+        self.experiments = experiments,
+        self.base_model = base_model,
+        self.name = name,
+        self.eval_conf_th = eval_conf_th,
+        self.yaml = yaml,
+        self.project = project,
+        self.neptune = neptune,
+        self.neptune_logger = neptune_logger,
+        self.batch_size = batch_size
+        
 
-    def validate(self):
-        experiments_dir = Path(args.experiments)
+    def validate(self) -> None:
+        experiments_dir = Path(self.experiments)
 
         # Load base model
-        model = YOLO(self.args.base_model)
+        model = YOLO(self.base_model)
 
         # Set experiment name
         name = (
-            self.args.name
-            if self.args.name
-            else f"{self.args.base_model}_{self.args.eval_conf_th}"
+            self.name
+            if self.name
+            else f"{self.base_model}_{self.eval_conf_th}"
         )
 
         # Set dataset path
-        yaml_path = self.args.yaml
-        dataset_path = "/".join(yaml_path.split("/")[:-1])
+        dataset_path = "/".join(self.yaml.split("/")[:-1])
 
-        # Add training parameters to neptune
-        neptune_logger = NeptuneLogger(
-            enable_run=self.args.neptune, project=self.args.project, run_name_or_id=name
-        )
-        neptune_logger.param("dataset path", dataset_path)
-        neptune_logger.param("conf", self.args.eval_conf_th)
-        neptune_logger.param("batch size", self.args.batch_size)
-        neptune_logger.param("Yolo model", self.args.base_model)
-        experiment_id = neptune_logger.get_id()
-        neptune_logger.tags("ValYOLO")
+        if self.neptune_logger is None:
+            self.neptune_logger = NeptuneLogger(
+                enable_run=self.neptune, project=self.project, run_name_or_id=name
+            )
+        self.neptune_logger.param("dataset path", dataset_path)
+        self.neptune_logger.param("conf", self.eval_conf_th)
+        self.neptune_logger.param("batch size", self.batch_size)
+        self.neptune_logger.param("Yolo model", self.base_model)
+        self.experiment_id = neptune_logger.get_id()
+        self.neptune_logger.tags("ValYOLO")
 
         results_path = Path(experiments_dir, experiment_id)
 
         # Validate the model
         val_metrics = model.val(
-            data=self.args.yaml,
-            batch=self.args.batch_size,
-            conf=self.args.eval_conf_th,
+            data=self.yaml,
+            batch=self.batch_size,
+            conf=self.eval_conf_th,
             project=str(results_path),
         )
 
@@ -56,7 +64,7 @@ class ValidateYOLO:
 
         for im_name in images_names:
             im_path = results_path.joinpath(im_name)
-            neptune_logger.upload_file(im_name, im_path)
+            self.neptune_logger.upload_file(im_name, im_path)
 
         # Precision and Recall
         conf_matrix = val_metrics.confusion_matrix.matrix
@@ -68,14 +76,14 @@ class ValidateYOLO:
                 class_R = (
                     conf_matrix[class_idx, class_idx] / conf_matrix[:, class_idx].sum()
                 )
-                neptune_logger.log(f"{class_name} Precision", round(class_P, 2))
-                neptune_logger.log(f"{class_name} Recall", round(class_R, 2))
+                self.neptune_logger.log(f"{class_name} Precision", round(class_P, 2))
+                self.neptune_logger.log(f"{class_name} Recall", round(class_R, 2))
 
         # Other metrics
         for metric_name, metric_value in val_metrics.results_dict.items():
-            neptune_logger.log(metric_name, metric_value)
+            self.neptune_logger.log(metric_name, metric_value)
 
-        neptune_logger.stop()
+        self.neptune_logger.stop()
 
 
 if __name__ == "__main__":
@@ -134,5 +142,5 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    validate_yolo = ValidateYOLO(args)
+    validate_yolo = ValidateYOLO(args.base_model, args.experiments, args.name, args.eval_conf_th, args.yaml, args.project, args.neptune, args.batch_size)
     validate_yolo.validate()

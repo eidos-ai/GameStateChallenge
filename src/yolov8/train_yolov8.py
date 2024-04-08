@@ -6,50 +6,60 @@ from validate_yolov8 import ValidateYOLO
 
 
 class TrainYOLO:
-    def __init__(self, args):
-        self.args = args
+    def __init__(self, base_model: str, experiments: str, name: str, eval_conf_th: float, yaml: str, project: str, neptune: bool, batch_size: int, epochs: int, initial_learning_rate: float, final_learning_rate: float):
+        self.base_model = base_model,
+        self.experiments = experiments,
+        self.name = name,
+        self.eval_conf_th = eval_conf_th,
+        self.yaml = yaml,
+        self.project = project,
+        self.neptune = neptune,
+        self.batch_size = batch_size,
+        self.epochs = epochs,
+        self.initial_learning_rate = initial_learning_rate,
+        self.final_learning_rate = final_learning_rate
+                
 
     def train(self):
-        experiments_dir = Path(args.experiments)
+        experiments_dir = Path(self.experiments)
 
         # Load base model
         model = YOLO(
-            args.base_model
+            self.base_model
         )  # load a pretrained model (recommended for training)
 
         name = (
-            args.name
-            if args.name
-            else f"{args.base_model}_{args.epochs}_{args.eval_conf_th}"
+            self.name
+            if self.name
+            else f"{self.base_model}_{self.epochs}_{self.eval_conf_th}"
         )
 
         # dataset path
-        yaml_path = args.yaml
-        dataset_path = "/".join(yaml_path.split("/")[:-1])
+        dataset_path = "/".join(self.yaml.split("/")[:-1])
 
         # Add training parameters to neptune
         neptune_logger = NeptuneLogger(
-            enable_run=args.neptune, project=args.project, run_name_or_id=name
+            enable_run=self.neptune, project=self.project, run_name_or_id=name
         )
         neptune_logger.param("dataset path", dataset_path)
-        neptune_logger.param("epochs", args.epochs)
-        neptune_logger.param("Eval conf th", args.eval_conf_th)
-        neptune_logger.param("batch size", args.batch_size)
-        neptune_logger.param("Yolo model", args.base_model)
-        neptune_logger.param("lr0", args.initial_learning_rate)
-        neptune_logger.param("lrf", args.final_learning_rate)
+        neptune_logger.param("epochs", self.epochs)
+        neptune_logger.param("Eval conf th", self.eval_conf_th)
+        neptune_logger.param("batch size", self.batch_size)
+        neptune_logger.param("Yolo model", self.base_model)
+        neptune_logger.param("lr0", self.initial_learning_rate)
+        neptune_logger.param("lrf", self.final_learning_rate)
         experiment_id = neptune_logger.get_id()
         neptune_logger.tags("TrainYOLO")
 
         # Start training
         model.train(
-            data=args.yaml,
-            epochs=args.epochs,
-            batch=args.batch_size,
+            data=self.yaml,
+            epochs=self.epochs,
+            batch=self.batch_size,
             name=experiment_id,
             project=str(experiments_dir),
-            lr0=args.initial_learning_rate,
-            lrf=args.final_learning_rate,
+            lr0=self.initial_learning_rate,
+            lrf=self.final_learning_rate,
         )  # train the model
         results_path = Path(experiments_dir, experiment_id)
 
@@ -67,10 +77,11 @@ class TrainYOLO:
             im_path = results_path.joinpath(im_name)
             neptune_logger.upload_file(im_name, im_path)
 
-        # Perfom evaluation on validation dataset
-        # val = ValidateYOLO(args)
-        # val.validate()
+        # Perfom evaluation on validation dataset        
+        validate_yolo = ValidateYOLO(self.base_model, self.experiments, self.name, self.eval_conf_th, self.yaml, self.project, self.neptune, neptune_logger, self.batch_size)
+        validate_yolo.validate()
 
+        # Stop NeptuneLogger instance
         neptune_logger.stop()
 
 
@@ -153,63 +164,5 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    experiments_dir = Path(args.experiments)
-
-    # Load base model
-    model = YOLO(args.base_model)  # load a pretrained model (recommended for training)
-
-    name = (
-        args.name
-        if args.name
-        else f"{args.base_model}_{args.epochs}_{args.eval_conf_th}"
-    )
-
-    # dataset path
-    yaml_path = args.yaml
-    dataset_path = "/".join(yaml_path.split("/")[:-1])
-
-    # Add training parameters to neptune
-    neptune_logger = NeptuneLogger(
-        enable_run=args.neptune, project=args.project, run_name_or_id=name
-    )
-    neptune_logger.param("dataset path", dataset_path)
-    neptune_logger.param("epochs", args.epochs)
-    neptune_logger.param("Eval conf th", args.eval_conf_th)
-    neptune_logger.param("batch size", args.batch_size)
-    neptune_logger.param("Yolo model", args.base_model)
-    neptune_logger.param("lr0", args.initial_learning_rate)
-    neptune_logger.param("lrf", args.final_learning_rate)
-    experiment_id = neptune_logger.get_id()
-    neptune_logger.tags("TrainYOLO")
-
-    # Start training
-    model.train(
-        data=args.yaml,
-        epochs=args.epochs,
-        batch=args.batch_size,
-        name=experiment_id,
-        project=str(experiments_dir),
-        lr0=args.initial_learning_rate,
-        lrf=args.final_learning_rate,
-    )  # train the model
-    results_path = Path(experiments_dir, experiment_id)
-
-    # Upload confusion matrix and other files
-    images_names = [
-        "confusion_matrix.png",
-        "F1_curve.png",
-        "labels.jpg",
-        "P_curve.png",
-        "PR_curve.png",
-        "R_curve.png",
-        "results.png",
-    ]
-    for im_name in images_names:
-        im_path = results_path.joinpath(im_name)
-        neptune_logger.upload_file(im_name, im_path)
-
-    # Perfom evaluation on validation dataset
-    val = ValidateYOLO(args)
-    val.validate()
-
-    neptune_logger.stop()
+    training = TrainYOLO(args.base_model, args.experiments, args.name, args.eval_conf_th, args.yaml, args.project, args.neptune, args.batch_size, args.epochs, args.initial_learning_rate, args.final_learning_rate)
+    training.train()
