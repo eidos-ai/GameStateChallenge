@@ -15,7 +15,7 @@ class ValidateYOLO:
         project: str,
         neptune: bool,
         batch_size: int,
-        neptune_logger: NeptuneLogger = None,
+        neptune_logger: NeptuneLogger = None,  # type: ignore
     ) -> None:
         self.experiments = experiments
         self.base_model = base_model
@@ -34,8 +34,9 @@ class ValidateYOLO:
         model = YOLO(self.base_model)
 
         # Set experiment name
-        name = self.name if self.name else f"{self.base_model}_{self.eval_conf_th}"
-
+        model_name = self.base_model.split("/")[-1:][0]
+        name = self.name if self.name else f"{model_name}_{self.eval_conf_th}"
+                
         # Set dataset path
         dataset_path = "/".join(self.yaml.split("/")[:-1])
 
