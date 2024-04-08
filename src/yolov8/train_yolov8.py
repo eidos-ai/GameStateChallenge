@@ -7,16 +7,16 @@ from validate_yolov8 import ValidateYOLO
 
 class TrainYOLO:
     def __init__(self, base_model: str, experiments: str, name: str, eval_conf_th: float, yaml: str, project: str, neptune: bool, batch_size: int, epochs: int, initial_learning_rate: float, final_learning_rate: float):
-        self.base_model = base_model,
-        self.experiments = experiments,
-        self.name = name,
-        self.eval_conf_th = eval_conf_th,
-        self.yaml = yaml,
-        self.project = project,
-        self.neptune = neptune,
-        self.batch_size = batch_size,
-        self.epochs = epochs,
-        self.initial_learning_rate = initial_learning_rate,
+        self.base_model = base_model
+        self.experiments = experiments
+        self.name = name
+        self.eval_conf_th = eval_conf_th
+        self.yaml = yaml
+        self.project = project
+        self.neptune = neptune
+        self.batch_size = batch_size
+        self.epochs = epochs
+        self.initial_learning_rate = initial_learning_rate
         self.final_learning_rate = final_learning_rate
                 
 
@@ -78,7 +78,7 @@ class TrainYOLO:
             neptune_logger.upload_file(im_name, im_path)
 
         # Perfom evaluation on validation dataset        
-        validate_yolo = ValidateYOLO(self.base_model, self.experiments, self.name, self.eval_conf_th, self.yaml, self.project, self.neptune, neptune_logger, self.batch_size)
+        validate_yolo = ValidateYOLO(self.base_model, self.experiments, self.name, self.eval_conf_th, self.yaml, self.project, self.neptune, self.batch_size, neptune_logger)
         validate_yolo.validate()
 
         # Stop NeptuneLogger instance
@@ -163,6 +163,6 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-
+    
     training = TrainYOLO(args.base_model, args.experiments, args.name, args.eval_conf_th, args.yaml, args.project, args.neptune, args.batch_size, args.epochs, args.initial_learning_rate, args.final_learning_rate)
     training.train()

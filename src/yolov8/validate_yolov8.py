@@ -5,16 +5,16 @@ from gsr.utils.neptune_logger import NeptuneLogger  # type: ignore
 
 
 class ValidateYOLO:
-    def __init__(self, base_model: str, experiments: str, name: str, eval_conf_th: float, yaml: str, project: str, neptune: bool, neptune_logger: NeptuneLogger=None, batch_size: int) -> None:
-        self.experiments = experiments,
-        self.base_model = base_model,
-        self.name = name,
-        self.eval_conf_th = eval_conf_th,
-        self.yaml = yaml,
-        self.project = project,
-        self.neptune = neptune,
-        self.neptune_logger = neptune_logger,
+    def __init__(self, base_model: str, experiments: str, name: str, eval_conf_th: float, yaml: str, project: str, neptune: bool, batch_size: int, neptune_logger: NeptuneLogger=None) -> None:
+        self.experiments = experiments
+        self.base_model = base_model
+        self.name = name
+        self.eval_conf_th = eval_conf_th
+        self.yaml = yaml
+        self.project = project
+        self.neptune = neptune
         self.batch_size = batch_size
+        self.neptune_logger = neptune_logger
         
 
     def validate(self) -> None:
@@ -141,6 +141,6 @@ if __name__ == "__main__":
         help="The name of the project",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args()    
     validate_yolo = ValidateYOLO(args.base_model, args.experiments, args.name, args.eval_conf_th, args.yaml, args.project, args.neptune, args.batch_size)
     validate_yolo.validate()
