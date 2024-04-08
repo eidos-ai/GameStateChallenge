@@ -3,6 +3,7 @@ import json
 import pandas as pd
 from torchvision.io import read_image
 from torch.utils.data import Dataset
+from typing import Optional, Callable
 
 
 class SoccerNetGSDataset(Dataset):
@@ -10,7 +11,10 @@ class SoccerNetGSDataset(Dataset):
     DATASET_PATH = "data/SoccerNetGS/gamestate-2024/"
 
     def __init__(
-        self, videos_directory: str, transform=None, target_transform=None
+        self,
+        videos_directory: str,
+        transform: Optional[Callable] = None,
+        target_transform: Optional[Callable] = None,
     ) -> None:
         self.videos_directory_path = f"{self.DATASET_PATH}{videos_directory}"
         self.transform = transform
@@ -51,7 +55,7 @@ class SoccerNetGSDataset(Dataset):
     def __len__(self) -> int:
         return len(self.labels)
 
-    def __getitem__(self, idx) -> tuple:
+    def __getitem__(self, idx: int) -> tuple:
         label = self.labels.iloc[idx]
         img_path = f"{self.videos_directory_path}/{label.video}/img1/{label.image}.jpg"
         image = read_image(img_path)
