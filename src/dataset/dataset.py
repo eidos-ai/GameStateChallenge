@@ -1,8 +1,5 @@
 import os
 import json
-import time
-import pandas as pd
-from torchvision.io import read_image
 from torch.utils.data import Dataset
 from typing import Optional, Callable
 from PIL import Image
@@ -31,7 +28,9 @@ class SoccerNetGSDataset(Dataset):
             video_path = os.path.join(self.dataset_path, video)
             if not os.path.isdir(video_path):
                 continue
-            labels_data = json.load(open(os.path.join(video_path, "Labels-GameState.json")))
+            labels_data = json.load(
+                open(os.path.join(video_path, "Labels-GameState.json"))
+            )
             for annotation in labels_data["annotations"]:
                 if annotation["category_id"] not in person_categories:
                     continue
@@ -58,10 +57,7 @@ class SoccerNetGSDataset(Dataset):
     def __getitem__(self, idx: int) -> tuple:
         label = self.labels[idx]
         img_path = os.path.join(
-            self.dataset_path,
-            label['video'],
-            'img1',
-            f"{label['image_id'][-6:]}.jpg"
+            self.dataset_path, label["video"], "img1", f"{label['image_id'][-6:]}.jpg"
         )
         pil_img = Image.open(img_path).convert("RGB")
         left = label["bbox"]["x"]
