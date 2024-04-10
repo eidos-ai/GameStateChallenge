@@ -3,6 +3,7 @@ import json
 from torch.utils.data import Dataset
 from typing import Optional, Callable
 from PIL import Image
+import random
 
 
 class SoccerNetGSDataset(Dataset):
@@ -72,3 +73,11 @@ class SoccerNetGSDataset(Dataset):
             label = self.target_transform(label)
 
         return img_crop, label
+
+
+if __name__ == "__main__":
+    dataset = SoccerNetGSDataset("data/SoccerNetGS/train")
+    print(dataset.__len__())
+    random_integers = [random.randint(0, dataset.__len__()) for _ in range(10)]
+    for idx in random_integers:
+        print(dataset.__getitem__(idx))
