@@ -57,7 +57,7 @@ class SoccerPersonTripletSelector(TripletSelector):
         self.margin = margin
         self.negative_selection_fn = negative_selection_fn
         
-    def get_triplets(self, embeddings: torch.FloatTensor, anchors_embeddings: torch.FloatTensor, labels: torch.IntTensor):
+    def get_triplets_with_anchor(self, embeddings: torch.FloatTensor, anchors_embeddings: torch.FloatTensor, labels: torch.IntTensor):
         logger.debug(f"Triplet selector embeddings {embeddings.shape}")
         logger.debug(f"Triplet selector anchors_embeddings {anchors_embeddings.shape}")
         logger.debug(f"Triplet selector labels {labels.shape}")
@@ -67,6 +67,47 @@ class SoccerPersonTripletSelector(TripletSelector):
             anchors_embeddings = anchors_embeddings.cpu()
         
         distance_matrix = pdist2(embeddings, anchors_embeddings)
+        distance_matrix = distance_matrix.cpu()
+        logger.debug(f"distance_matrix {distance_matrix.shape}")
+        
+        labels = labels.cpu().data.numpy()
+        
+        triplets = []
+        
+        for image_index in range(len(embeddings)):
+            # Anchors embeddings are same length as image embeddings
+            positive_anchor_index = image_index
+            # Negative anchors are those for different brands
+            label = labels[image_index]
+            same_label_mask = (labels == label)
+            negative_indices = np.where(np.logical_not(same_label_mask))[0]
+            
+            ap_distance = distance_matrix[image_index, positive_anchor_index]
+            # Each image has many possible negative anchors.
+            # The negative_selection_fn function decides which negative anchor to use. 
+            loss_values = ap_distance - distance_matrix[torch.LongTensor(np.array([image_index])), torch.LongTensor(negative_indices)] + self.margin
+            loss_values = loss_values.data.cpu().numpy()
+            hard_negative = self.negative_selection_fn(loss_values)
+
+            if hard_negative is not None:
+                hard_negative_anchor_index = negative_indices[hard_negative]
+                triplets.append([image_index, positive_anchor_index, hard_negative_anchor_index])
+        
+        if len(triplets) == 0:
+            triplets.append([0, 0, negative_indices[0]])
+            
+        triplets = np.array(triplets)   
+        logger.debug(f"Triplets choosen {triplets}")  
+        return torch.LongTensor(triplets)
+    
+    def get_triplets(self, embeddings: torch.FloatTensor, labels: torch.IntTensor):
+        logger.debug(f"Triplet selector embeddings {embeddings.shape}")
+        logger.debug(f"Triplet selector labels {labels.shape}")
+        
+        if self.cpu:
+            embeddings = embeddings.cpu()
+        
+        distance_matrix = pdist(embeddings)
         distance_matrix = distance_matrix.cpu()
         logger.debug(f"distance_matrix {distance_matrix.shape}")
         
@@ -113,17 +154,17 @@ class OnlineTripletLoss(nn.Module):
         self.margin = margin
         self.triplet_selector = triplet_selector
 
-    def forward(self, embeddings, anchors_embeddings, target):
+    def forward(self, embeddings, target):
         
-        triplets = self.triplet_selector.get_triplets(embeddings, anchors_embeddings, target)
+        triplets = self.triplet_selector.get_triplets(embeddings, target)
 
         if embeddings.is_cuda:
             triplets = triplets.cuda()
         
         # Triplets are given as image_index, anchor_positive_index, anchor_negative_index.
         # So last indexes are taken from anchors_embeddings
-        ap_distances = distance(embeddings[triplets[:, 0]], anchors_embeddings[triplets[:, 1]])
-        an_distances = distance(embeddings[triplets[:, 0]], anchors_embeddings[triplets[:, 2]])
+        ap_distances = distance(embeddings[triplets[:, 0]], embeddings[triplets[:, 1]])
+        an_distances = distance(embeddings[triplets[:, 0]], embeddings[triplets[:, 2]])
         losses = F.relu(ap_distances - an_distances + self.margin)
         
         ap_distances_mean = ap_distances.mean().item()
