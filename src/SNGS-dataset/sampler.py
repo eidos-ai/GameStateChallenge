@@ -67,3 +67,5 @@ class SoccerNetGSBatchSampler(BatchSampler):
 if __name__ == "__main__":
     dataset = SoccerNetGSDataset("data/SoccerNetGS/train")
     sampler = SoccerNetGSBatchSampler(dataset.labels, 2, 2)
+
+    print(f"Number of batches: {len(sampler)}")

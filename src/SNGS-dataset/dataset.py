@@ -77,7 +77,7 @@ class SoccerNetGSDataset(Dataset):
 
 if __name__ == "__main__":
     dataset = SoccerNetGSDataset("data/SoccerNetGS/train")
-    print(dataset.__len__())
-    random_integers = [random.randint(0, dataset.__len__()) for _ in range(10)]
+    print(f"Dataset lenght: {len(dataset)}")
+    random_integers = [random.randint(0, len(dataset)) for _ in range(10)]
     for idx in random_integers:
-        print(dataset.__getitem__(idx))
+        print(dataset[idx])
