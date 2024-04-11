@@ -5,6 +5,15 @@ from typing import Optional, Callable
 from PIL import Image
 import random
 
+LABELS_MAP = {
+    "player_left": 0,
+    "player_right": 1,
+    "goalkeeper_left": 2,
+    "goalkeeper_right": 3,
+    "referee": 4,
+    "other": 5,
+}
+
 
 class SoccerNetGSDataset(Dataset):
 
@@ -35,14 +44,37 @@ class SoccerNetGSDataset(Dataset):
             for annotation in labels_data["annotations"]:
                 if annotation["category_id"] not in person_categories:
                     continue
+
+                role_id = None
+                role = annotation["attributes"]["role"]
+                if role == "player":
+                    role_id = (
+                        LABELS_MAP["player_left"]
+                        if annotation["team"] == "left"
+                        else LABELS_MAP["player_right"]
+                    )
+                elif role == "goalkeeper":
+                    role_id = (
+                        LABELS_MAP["goalkeeper_left"]
+                        if annotation["team"] == "left"
+                        else LABELS_MAP["goalkeeper_right"]
+                    )
+                elif role == "referee":
+                    role_id = LABELS_MAP["referee"]
+                elif role == "other":
+                    role_id = LABELS_MAP["other"]
+                else:
+                    role_id = -1
+
                 self.labels.append(
                     {
                         "annotation_id": annotation["id"],
                         "video": video,
                         "image_id": annotation["image_id"],
                         "track_id": annotation["track_id"],
-                        "role": annotation["attributes"]["role"],
+                        "role": role,
                         "team": annotation["attributes"]["team"],
+                        "role_id": role_id,
                         "bbox": {
                             "x": annotation["bbox_image"]["x"],
                             "y": annotation["bbox_image"]["y"],
