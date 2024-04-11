@@ -15,6 +15,30 @@ LABELS_MAP = {
 }
 
 
+def map_role_id(annotation: dict) -> int:
+    role_id = None
+    role = annotation["attributes"]["role"]
+    if role == "player":
+        role_id = (
+            LABELS_MAP["player_left"]
+            if annotation["team"] == "left"
+            else LABELS_MAP["player_right"]
+        )
+    elif role == "goalkeeper":
+        role_id = (
+            LABELS_MAP["goalkeeper_left"]
+            if annotation["team"] == "left"
+            else LABELS_MAP["goalkeeper_right"]
+        )
+    elif role == "referee":
+        role_id = LABELS_MAP["referee"]
+    elif role == "other":
+        role_id = LABELS_MAP["other"]
+    else:
+        role_id = -1
+    return role_id
+
+
 class SoccerNetGSDataset(Dataset):
 
     def __init__(
@@ -44,35 +68,14 @@ class SoccerNetGSDataset(Dataset):
             for annotation in labels_data["annotations"]:
                 if annotation["category_id"] not in person_categories:
                     continue
-
-                role_id = None
-                role = annotation["attributes"]["role"]
-                if role == "player":
-                    role_id = (
-                        LABELS_MAP["player_left"]
-                        if annotation["team"] == "left"
-                        else LABELS_MAP["player_right"]
-                    )
-                elif role == "goalkeeper":
-                    role_id = (
-                        LABELS_MAP["goalkeeper_left"]
-                        if annotation["team"] == "left"
-                        else LABELS_MAP["goalkeeper_right"]
-                    )
-                elif role == "referee":
-                    role_id = LABELS_MAP["referee"]
-                elif role == "other":
-                    role_id = LABELS_MAP["other"]
-                else:
-                    role_id = -1
-
+                role_id = map_role_id(annotation)
                 self.labels.append(
                     {
                         "annotation_id": annotation["id"],
                         "video": video,
                         "image_id": annotation["image_id"],
                         "track_id": annotation["track_id"],
-                        "role": role,
+                        "role": annotation["attributes"]["role"],
                         "team": annotation["attributes"]["team"],
                         "role_id": role_id,
                         "bbox": {
