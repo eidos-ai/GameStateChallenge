@@ -62,9 +62,12 @@ class SoccerNetGSDataset(Dataset):
             video_path = os.path.join(self.dataset_path, video)
             if not os.path.isdir(video_path):
                 continue
-            labels_data = json.load(
-                open(os.path.join(video_path, "Labels-GameState.json"))
-            )
+            try:
+                labels_data = json.load(
+                    open(os.path.join(video_path, "Labels-GameState.json"))
+                )
+            except:
+                continue
             for annotation in labels_data["annotations"]:
                 if annotation["category_id"] not in person_categories:
                     continue
