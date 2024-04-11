@@ -21,13 +21,13 @@ def map_role_id(annotation: dict) -> int:
     if role == "player":
         role_id = (
             LABELS_MAP["player_left"]
-            if annotation["team"] == "left"
+            if annotation["attributes"]["team"] == "left"
             else LABELS_MAP["player_right"]
         )
     elif role == "goalkeeper":
         role_id = (
             LABELS_MAP["goalkeeper_left"]
-            if annotation["team"] == "left"
+            if annotation["attributes"]["team"] == "left"
             else LABELS_MAP["goalkeeper_right"]
         )
     elif role == "referee":
@@ -115,4 +115,5 @@ if __name__ == "__main__":
     print(f"Dataset lenght: {len(dataset)}")
     random_integers = [random.randint(0, len(dataset)) for _ in range(10)]
     for idx in random_integers:
-        print(dataset[idx])
+        crop, label = dataset[idx]
+        print(label["role_id"])
