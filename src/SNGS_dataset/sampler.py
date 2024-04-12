@@ -1,7 +1,6 @@
 import numpy as np
 from typing import Any
 from torch.utils.data import BatchSampler
-from dataset import SoccerNetGSDataset
 
 
 class SoccerNetGSBatchSampler(BatchSampler):
@@ -66,17 +65,23 @@ class SoccerNetGSBatchSampler(BatchSampler):
 
 if __name__ == "__main__":
     from torch.utils.data import DataLoader
+    import sys
+    sys.path.append("../models")
+    from dataset import SoccerNetGSDataset
+    from models.resnet import TRANSFORM
     
-    dataset = SoccerNetGSDataset("data/SoccerNetGS/train")
+    dataset = SoccerNetGSDataset("data/SoccerNetGS/train", transform=TRANSFORM)
     sampler = SoccerNetGSBatchSampler(dataset.labels, 1, 30)
-    loader = DataLoader(dataset=dataset, sampler=sampler)
+    loader = DataLoader(dataset=dataset, batch_sampler=sampler)
 
     print(f"Number of batches: {len(sampler)}")
     
     batch_idx_limit = 5
-    for batch_idx, (images, labels) in enumerate(loader):
+    # for batch_idx, (images, labels) in enumerate(loader):
+    for batch_idx, data in enumerate(loader):
         if batch_idx == batch_idx_limit: break
         
-        print(f"model input size: {images.shape}")
-        print(f"labels size: {labels.shape}")
+        # print(f"model input size: {images.shape}")
+        # print(f"labels size: {labels.shape}")
+        print(data)
         print("//////////////////////////")
