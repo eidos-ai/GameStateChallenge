@@ -141,35 +141,36 @@ def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger):
             metric.reset()
         model.eval()
         val_loss = 0
-        for batch_idx, (image, anchor, target, names) in enumerate(val_loader):
-            target = target if len(target) > 0 else None
-            image = image.to(device)
-            anchor = anchor.to(device)
-            target = target.to(device)
+        for batch_idx, (images, labels) in enumerate(val_loader):
+            labels = labels if len(labels) > 0 else None
+            images = images.to(device)
+            labels = labels.to(device)
 
-            concatenated = torch.cat((image, anchor), dim=0)
-            outputs = model(concatenated)
-            outputs_images, outputs_anchors = torch.split(outputs, len(image), dim=0)
-            logger.debug(f"Outputs Images {outputs_images.shape}")
-            logger.debug(f"Outputs Anchors {outputs_anchors.shape}")
+            _ , embeddings = model(images)
+            # concatenated = torch.cat((image, anchor), dim=0)
+            # outputs = model(concatenated)
+            # outputs_images, outputs_anchors = torch.split(outputs, len(image), dim=0)
+            # logger.debug(f"Outputs Images {outputs_images.shape}")
+            # logger.debug(f"Outputs Anchors {outputs_anchors.shape}")
                 
-            loss_inputs = (outputs_images, outputs_anchors)
-            if target is not None:
-                target = (target,)
-                loss_inputs += target
+            # loss_inputs = (outputs_images, outputs_anchors)
+            # if target is not None:
+            #     target = (target,)
+            #     loss_inputs += target
 
-            loss_outputs = loss_fn(*loss_inputs)
+            loss_outputs = loss_fn(embeddings, labels)
             loss = loss_outputs[0] if type(loss_outputs) in (tuple, list) else loss_outputs
             val_loss += loss.item()
             
             ap_distance = loss_outputs[2]
             an_distance = loss_outputs[3]
-            neptune_logger.log("ap_distance_test", ap_distance)
-            neptune_logger.log("an_distance_test", an_distance)
+            neptune_logger.log("ap_distance_valid", ap_distance)
+            neptune_logger.log("an_distance_valid", an_distance)
 
 
-            for metric in metrics:
-                metric(outputs, target, loss_outputs)
+            # for metric in metrics:
+            #     metric(outputs, target, loss_outputs)
+        val_loss /= (batch_idx + 1)
     return val_loss, metrics
 
 # Custom function to parse a comma-separated list of integers
@@ -189,15 +190,15 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--train', required=True, help='Path to directory with SoccerNetGSR train split')
     parser.add_argument('-te', '--test', required=False, help='Path to directory with SoccerNetGSR test split')
     parser.add_argument('-v', '--valid', required=True, help='Path to directory with SoccerNetGSR valid split')
-    parser.add_argument('-e', '--epochs', type=int, required=False, default=20, help='number of epochs to train model')
-    parser.add_argument('-lr', '--learning_rate', type=float, required=False, default=1e-4, help='optimizer learning rate')
+    parser.add_argument('-e', '--epochs', type=int, required=False, default=5, help='number of epochs to train model')
+    parser.add_argument('-lr', '--learning_rate', type=float, required=False, default=1e-3, help='optimizer learning rate')
     parser.add_argument('--n_videos', type=int, required=False, default=1, help='number of different videos per batch')
     parser.add_argument('--n_samples', type=int, required=False, default=99, help='number of samples per video per batch')
     parser.add_argument('--selector', type=str, required=False, default="HardestNegative", help='triplet selector to use')
     
     parser.add_argument("--resnet_model", required=False, type=str, default="resnet18", help="Resnet arch to use as backbone")
-    parser.add_argument("--out_features", required=False, type=int, default=20, help="MLP output features")
-    parser.add_argument("--hidden", required=False, type=parse_int_list, default=[512, 128], help="MLP hidden layers as comma-separated list of integers")
+    parser.add_argument("--out_features", required=False, type=int, default=10, help="MLP output features")
+    parser.add_argument("--hidden", required=False, type=parse_int_list, default=[256, 128], help="MLP hidden layers as comma-separated list of integers")
 
     parser.add_argument("--neptune", required=False, action="store_true", default=False, help="Log experiment results to neptune")
     parser.add_argument("--project", required=False, type=str, default="eidos/GameStateChallenge", help="The name of the project")
