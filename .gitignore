@@ -4,6 +4,7 @@ env
 .DS_Store
 .ipynb_checkpoints
 .mypy_cache
+.vscode
 
 # Data folders
 data/
