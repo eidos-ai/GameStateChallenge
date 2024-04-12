@@ -81,10 +81,9 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
     losses = []
     total_loss = 0
 
-    for batch_idx, (images, labels) in list(enumerate(train_loader)):
+    for batch_idx, (images, labels) in enumerate(train_loader):
         logger.debug(f"batch image shape {images.shape}")
-        labels = labels if len(labels) > 0 else None
-        labels = torch.Tensor([l["role_id"] for l in labels], dtype=int)
+        labels = labels["role_id"] if len(labels) > 0 else None
         
         logger.debug(f"Moving to device")
         
@@ -94,7 +93,7 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
         logger.debug(f"Going into model")
     
         optimizer.zero_grad()
-        model_output = model(images)
+        _ , embeddings = model(images)
         # concatenated = torch.cat((image, anchor), dim=0)
         # outputs = model(concatenated)
         # outputs_images, outputs_anchors = torch.split(outputs, len(image), dim=0)
@@ -107,8 +106,7 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
         #     loss_inputs += target
 
         # loss_outputs = loss_fn(*loss_inputs)
-        
-        loss_outputs = loss_fn(model_output, labels)
+        loss_outputs = loss_fn(embeddings, labels)
         
         logger.debug("loss")
         loss = loss_outputs[0] if type(loss_outputs) in (tuple, list) else loss_outputs
@@ -249,7 +247,7 @@ if __name__ == "__main__":
     kwargs = {'num_workers': 4, 'pin_memory': True} if device == "cuda" else {}
     
     # Load adequate model and transform for input
-    model = ResnetMLP("resnet18", mlp_hidden_layers=hidden_layers, mlp_output_size=out_features)
+    model = ResnetMLP("resnet18", mlp_hidden_layers=hidden_layers, mlp_output_size=out_features).to(device)
     transform = RESNET_TRANSFORM
         
     total_params = sum(p.numel() for p in model.parameters())
@@ -258,12 +256,12 @@ if __name__ == "__main__":
     neptune_logger.param("Trainable parameters", trainable_params)
 
     logger.info("Creating train dataset and dataloader")
-    train_dataset = SoccerNetGSDataset(train_dataset_path, transform)
+    train_dataset = SoccerNetGSDataset(train_dataset_path, transform=transform)
     train_batch_sampler = SoccerNetGSBatchSampler(train_dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_per_video_batch)
     online_train_loader = torch.utils.data.DataLoader(train_dataset, batch_sampler=train_batch_sampler, **kwargs)
     
     logger.info("Creating validation dataset and dataloader")
-    valid_dataset = SoccerNetGSDataset(valid_dataset_path, transform)
+    valid_dataset = SoccerNetGSDataset(valid_dataset_path, transform=transform)
     valid_batch_sampler = SoccerNetGSBatchSampler(valid_dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_per_video_batch)
     online_valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_sampler=valid_batch_sampler, **kwargs)
     

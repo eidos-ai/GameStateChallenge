@@ -71,19 +71,19 @@ if __name__ == "__main__":
     from dataset import SoccerNetGSDataset
     from models.resnet import TRANSFORM
 
-    dataset = SoccerNetGSDataset("data/SoccerNetGS/train", transform=TRANSFORM)
+    dataset = SoccerNetGSDataset("../../data/SoccerNetGS/train", transform=TRANSFORM)
     sampler = SoccerNetGSBatchSampler(dataset.labels, 1, 30)
     loader = DataLoader(dataset=dataset, batch_sampler=sampler)
 
     print(f"Number of batches: {len(sampler)}")
 
-    batch_idx_limit = 5
-    # for batch_idx, (images, labels) in enumerate(loader):
+    # batch_idx_limit = 5
     for batch_idx, data in enumerate(loader):
-        if batch_idx == batch_idx_limit:
-            break
-
-        # print(f"model input size: {images.shape}")
-        # print(f"labels size: {labels.shape}")
+    # for batch_idx, (images, labels) in enumerate(loader):
+        
+        # if batch_idx == batch_idx_limit:
+        #     break
         print(data)
+        # print(f"model input size: {images.shape}")
+        # print(f"labels size: {labels['role_id'].shape}")
         print("//////////////////////////")
