@@ -110,7 +110,6 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
         
         logger.debug("loss")
         loss = loss_outputs[0] if type(loss_outputs) in (tuple, list) else loss_outputs
-        print(loss)
         losses.append(loss.item())
         total_loss += loss.item()
         loss.backward()

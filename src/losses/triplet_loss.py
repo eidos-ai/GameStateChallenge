@@ -100,45 +100,37 @@ class SoccerPersonTripletSelector(TripletSelector):
         logger.debug(f"Triplets choosen {triplets}")  
         return torch.LongTensor(triplets)
     
-    def get_triplets(self, embeddings: torch.FloatTensor, labels: torch.IntTensor):
-        logger.debug(f"Triplet selector embeddings {embeddings.shape}")
-        logger.debug(f"Triplet selector labels {labels.shape}")
-        
-        if self.cpu:
-            embeddings = embeddings.cpu()
-        
+    def get_triplets(self, embeddings: torch.FloatTensor, labels: torch.LongTensor):
+        embeddings = embeddings.cpu()
+        labels = labels.cpu().data.numpy()
+        # Create matrix with squared euclidean distances of all embeddings with each other
         distance_matrix = pdist(embeddings)
         distance_matrix = distance_matrix.cpu()
-        logger.debug(f"distance_matrix {distance_matrix.shape}")
-        
-        labels = labels.cpu().data.numpy()
-        
-        triplets = []
-        
-        for image_index in range(len(embeddings)):
-            # Anchors embeddings are same length as image embeddings
-            positive_anchor_index = image_index
-            # Negative anchors are those for different brands
-            label = labels[image_index]
-            same_label_mask = (labels == label)
-            negative_indices = np.where(np.logical_not(same_label_mask))[0]
-            
-            ap_distance = distance_matrix[image_index, positive_anchor_index]
-            # Each image has many possible negative anchors.
-            # The negative_selection_fn function decides which negative anchor to use. 
-            loss_values = ap_distance - distance_matrix[torch.LongTensor(np.array([image_index])), torch.LongTensor(negative_indices)] + self.margin
-            loss_values = loss_values.data.cpu().numpy()
-            hard_negative = self.negative_selection_fn(loss_values)
 
-            if hard_negative is not None:
-                hard_negative_anchor_index = negative_indices[hard_negative]
-                triplets.append([image_index, positive_anchor_index, hard_negative_anchor_index])
-        
+        triplets = []
+        for label in set(labels):
+            label_mask = (labels == label)
+            label_indices = np.where(label_mask)[0]
+            if len(label_indices) < 2:
+                continue
+            negative_indices = np.where(np.logical_not(label_mask))[0]
+            anchor_positives = list(combinations(label_indices, 2))  # All anchor-positive pairs
+            anchor_positives = np.array(anchor_positives)
+
+            ap_distances = distance_matrix[anchor_positives[:, 0], anchor_positives[:, 1]]
+            for anchor_positive, ap_distance in zip(anchor_positives, ap_distances):
+                loss_values = ap_distance - distance_matrix[torch.LongTensor(np.array([anchor_positive[0]])), torch.LongTensor(negative_indices)] + self.margin
+                loss_values = loss_values.data.cpu().numpy()
+                hard_negative = self.negative_selection_fn(loss_values)
+                if hard_negative is not None:
+                    hard_negative = negative_indices[hard_negative]
+                    triplets.append([anchor_positive[0], anchor_positive[1], hard_negative])
+
         if len(triplets) == 0:
-            triplets.append([0, 0, negative_indices[0]])
-            
-        triplets = np.array(triplets)   
-        logger.debug(f"Triplets choosen {triplets}")  
+            triplets.append([anchor_positive[0], anchor_positive[1], negative_indices[0]])
+
+        triplets = np.array(triplets)
+
         return torch.LongTensor(triplets)
 
 class OnlineTripletLoss(nn.Module):
