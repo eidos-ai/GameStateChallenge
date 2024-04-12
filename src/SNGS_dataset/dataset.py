@@ -66,7 +66,7 @@ class SoccerNetGSDataset(Dataset):
                 labels_data = json.load(
                     open(os.path.join(video_path, "Labels-GameState.json"))
                 )
-            except:
+            except FileNotFoundError:
                 continue
             for annotation in labels_data["annotations"]:
                 if annotation["category_id"] not in person_categories:
@@ -79,7 +79,7 @@ class SoccerNetGSDataset(Dataset):
                         "image_id": annotation["image_id"],
                         "track_id": annotation["track_id"],
                         "role": annotation["attributes"]["role"],
-                        "team": annotation["attributes"]["team"],
+                        "team": annotation["attributes"]["team"] if annotation["attributes"]["team"] else "",
                         "role_id": role_id,
                         "bbox": {
                             "x": annotation["bbox_image"]["x"],
@@ -109,14 +109,21 @@ class SoccerNetGSDataset(Dataset):
             img_crop = self.transform(img_crop)
         if self.target_transform:
             label = self.target_transform(label)
-
         return img_crop, label
 
 
 if __name__ == "__main__":
-    dataset = SoccerNetGSDataset("../../data/SoccerNetGS/train") 
+    import sys
+    from tqdm import tqdm
+    sys.path.append("../models")
+    from models.resnet import TRANSFORM
+    
+    dataset = SoccerNetGSDataset("../../data/SoccerNetGS/train", transform=TRANSFORM) 
     print(f"Dataset lenght: {len(dataset)}")
-    random_integers = [random.randint(0, len(dataset)) for _ in range(10)]
-    for idx in random_integers:
-        crop, label = dataset[idx]
-        print(label["role_id"])
+    idx_th = 100
+    for idx, dataset_item in tqdm(enumerate(dataset), total=len(dataset)):
+        crop, label = dataset_item
+        
+        if idx == idx_th:
+            break
+        
