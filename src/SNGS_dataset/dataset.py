@@ -44,6 +44,7 @@ class SoccerNetGSDataset(Dataset):
     def __init__(
         self,
         dataset_path: str,
+        games_list: Optional[list] = None,
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,
     ) -> None:
@@ -59,6 +60,8 @@ class SoccerNetGSDataset(Dataset):
         ]  # 1: player, 2: goalkeeper, 3: referee, 7: other
         self.labels = []
         for video in os.listdir(self.dataset_path):
+            if games_list and video not in games_list:
+                continue
             video_path = os.path.join(self.dataset_path, video)
             if not os.path.isdir(video_path):
                 continue
@@ -79,7 +82,11 @@ class SoccerNetGSDataset(Dataset):
                         "image_id": annotation["image_id"],
                         "track_id": annotation["track_id"],
                         "role": annotation["attributes"]["role"],
-                        "team": annotation["attributes"]["team"] if annotation["attributes"]["team"] else "",
+                        "team": (
+                            annotation["attributes"]["team"]
+                            if annotation["attributes"]["team"]
+                            else ""
+                        ),
                         "role_id": role_id,
                         "bbox": {
                             "x": annotation["bbox_image"]["x"],
@@ -115,15 +122,32 @@ class SoccerNetGSDataset(Dataset):
 if __name__ == "__main__":
     import sys
     from tqdm import tqdm
+
+    sys.path.append("..")
     sys.path.append("../models")
+    # sys.path.append("/Users/francisco/Documents/GameStateChallenge")
+    # sys.path.append("/Users/francisco/Documents/GameStateChallenge/src")
+    # sys.path.append("/Users/francisco/Documents/GameStateChallenge/src/models")
     from models.resnet import TRANSFORM
-    
-    dataset = SoccerNetGSDataset("../../data/SoccerNetGS/train", transform=TRANSFORM) 
+
+    dataset = SoccerNetGSDataset(
+        "../../data/SoccerNetGS/train",
+        games_list=["SNGS-175", "SNGS-111", "SNGS-050", "SNGS-077"],
+        transform=TRANSFORM,
+    )
+
+    # dataset = SoccerNetGSDataset(
+    #     "data/SoccerNetGS/train",
+    #     games_list=["SNGS-175", "SNGS-111", "SNGS-050", "SNGS-077"],
+    #     transform=TRANSFORM,
+    # )
+
     print(f"Dataset lenght: {len(dataset)}")
-    idx_th = 100
+    idx_th = 100000
     for idx, dataset_item in tqdm(enumerate(dataset), total=len(dataset)):
         crop, label = dataset_item
-        
+        if label["video"] != "SNGS-111" and label["video"] != "SNGS-077":
+            print("error in video name", label["video"])
+
         if idx == idx_th:
             break
-        
