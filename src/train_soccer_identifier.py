@@ -47,11 +47,11 @@ def fit(train_loader, val_loader, model, loss_fn, optimizer, scheduler, n_epochs
         # for metric in metrics:
         #     message += '\t{}: {}'.format(metric.name(), metric.value())
 
-        # valid_loss, _ = valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger)
-        # valid_loss /= len(val_loader)
-        # neptune_logger.log("valid_loss", valid_loss)
-        # message += '\nEpoch: {}/{}. Validation set: Average loss: {:.4f}'.format(epoch + 1, n_epochs,
-        #                                                                          valid_loss)
+        valid_loss, _ = valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger)
+        valid_loss /= len(val_loader)
+        neptune_logger.log("valid_loss", valid_loss)
+        message += '\nEpoch: {}/{}. Validation set: Average loss: {:.4f}'.format(epoch + 1, n_epochs,
+                                                                                 valid_loss)
         # for metric in metrics:
         #     message += '\t{}: {}'.format(metric.name(), metric.value())
         
@@ -134,7 +134,7 @@ def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger):
             labels = labels.to(device)
             images = images.to(device)
 
-            _ , embeddings = model(images)
+            embeddings = model(images)
 
             loss_outputs = loss_fn(embeddings, labels)
             loss = loss_outputs[0] if type(loss_outputs) in (tuple, list) else loss_outputs
@@ -237,12 +237,12 @@ if __name__ == "__main__":
     neptune_logger.param("Trainable parameters", trainable_params)
 
     logger.info("Creating train dataset and dataloader")
-    train_dataset = SoccerNetGSDataset(train_dataset_path, transform=transform)
+    train_dataset = SoccerNetGSDataset(train_dataset_path, transform=transform, games_list=["SNGS-060", "SNGS-097", "SNGS-151"])
     train_batch_sampler = SoccerNetGSBatchSampler(train_dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_per_video_batch)
     online_train_loader = torch.utils.data.DataLoader(train_dataset, batch_sampler=train_batch_sampler, **kwargs)
     
     logger.info("Creating validation dataset and dataloader")
-    valid_dataset = SoccerNetGSDataset(valid_dataset_path, transform=transform)
+    valid_dataset = SoccerNetGSDataset(valid_dataset_path, transform=transform, games_list=["SNGS-021", "SNGS-039", "SNGS-078"])
     valid_batch_sampler = SoccerNetGSBatchSampler(valid_dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_per_video_batch)
     online_valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_sampler=valid_batch_sampler, **kwargs)
     
