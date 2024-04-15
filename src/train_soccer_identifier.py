@@ -43,20 +43,17 @@ def fit(train_loader, val_loader, model, loss_fn, optimizer, scheduler, n_epochs
         # Train stage
         train_loss, _ = train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, metrics, neptune_logger)
         neptune_logger.log("train_loss", train_loss)
-
         message = 'Epoch: {}/{}. Train set: Average loss: {:.4f}'.format(epoch + 1, n_epochs, train_loss)
         # for metric in metrics:
         #     message += '\t{}: {}'.format(metric.name(), metric.value())
 
-        valid_loss, _ = valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger)
-
-        valid_loss /= len(val_loader)
-        neptune_logger.log("test_loss", valid_loss)
-
-        message += '\nEpoch: {}/{}. Validation set: Average loss: {:.4f}'.format(epoch + 1, n_epochs,
-                                                                                 valid_loss)
-        for metric in metrics:
-            message += '\t{}: {}'.format(metric.name(), metric.value())
+        # valid_loss, _ = valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger)
+        # valid_loss /= len(val_loader)
+        # neptune_logger.log("valid_loss", valid_loss)
+        # message += '\nEpoch: {}/{}. Validation set: Average loss: {:.4f}'.format(epoch + 1, n_epochs,
+        #                                                                          valid_loss)
+        # for metric in metrics:
+        #     message += '\t{}: {}'.format(metric.name(), metric.value())
         
         # if (epoch % 5 == 0) or (epoch == n_epochs - 1):
         #     # accuracy = accuracy_eval.eval_identifier(model, inference_transform, euclidean_distance)
@@ -93,19 +90,9 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
         logger.debug(f"Going into model")
     
         optimizer.zero_grad()
-        _ , embeddings = model(images)
-        # concatenated = torch.cat((image, anchor), dim=0)
-        # outputs = model(concatenated)
-        # outputs_images, outputs_anchors = torch.split(outputs, len(image), dim=0)
-        # logger.debug(f"Outputs Images {outputs_images.shape}")
-        # logger.debug(f"Outputs Anchors {outputs_anchors.shape}")
         
-        # loss_inputs = (outputs_images, outputs_anchors)
-        # if target is not None:
-        #     target = (target,)
-        #     loss_inputs += target
+        _ , embeddings = model(images)
 
-        # loss_outputs = loss_fn(*loss_inputs)
         loss_outputs = loss_fn(embeddings, labels)
         
         logger.debug("loss")
@@ -142,21 +129,12 @@ def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger):
         model.eval()
         val_loss = 0
         for batch_idx, (images, labels) in enumerate(val_loader):
-            labels = labels if len(labels) > 0 else None
-            images = images.to(device)
+            logger.debug(f"batch image shape {images.shape}")
+            labels = labels["role_id"] if len(labels) > 0 else None
             labels = labels.to(device)
+            images = images.to(device)
 
             _ , embeddings = model(images)
-            # concatenated = torch.cat((image, anchor), dim=0)
-            # outputs = model(concatenated)
-            # outputs_images, outputs_anchors = torch.split(outputs, len(image), dim=0)
-            # logger.debug(f"Outputs Images {outputs_images.shape}")
-            # logger.debug(f"Outputs Anchors {outputs_anchors.shape}")
-                
-            # loss_inputs = (outputs_images, outputs_anchors)
-            # if target is not None:
-            #     target = (target,)
-            #     loss_inputs += target
 
             loss_outputs = loss_fn(embeddings, labels)
             loss = loss_outputs[0] if type(loss_outputs) in (tuple, list) else loss_outputs
@@ -191,13 +169,13 @@ if __name__ == "__main__":
     parser.add_argument('-te', '--test', required=False, help='Path to directory with SoccerNetGSR test split')
     parser.add_argument('-v', '--valid', required=True, help='Path to directory with SoccerNetGSR valid split')
     parser.add_argument('-e', '--epochs', type=int, required=False, default=5, help='number of epochs to train model')
-    parser.add_argument('-lr', '--learning_rate', type=float, required=False, default=1e-3, help='optimizer learning rate')
+    parser.add_argument('-lr', '--learning_rate', type=float, required=False, default=1e-4, help='optimizer learning rate')
     parser.add_argument('--n_videos', type=int, required=False, default=1, help='number of different videos per batch')
     parser.add_argument('--n_samples', type=int, required=False, default=99, help='number of samples per video per batch')
     parser.add_argument('--selector', type=str, required=False, default="HardestNegative", help='triplet selector to use')
     
-    parser.add_argument("--resnet_model", required=False, type=str, default="resnet18", help="Resnet arch to use as backbone")
-    parser.add_argument("--out_features", required=False, type=int, default=10, help="MLP output features")
+    parser.add_argument("--backbone", required=False, type=str, default="resnet18", help="Resnet arch to use as backbone")
+    parser.add_argument("--out_features", required=False, type=int, default=64, help="MLP output features")
     parser.add_argument("--hidden", required=False, type=parse_int_list, default=[256, 128], help="MLP hidden layers as comma-separated list of integers")
 
     parser.add_argument("--neptune", required=False, action="store_true", default=False, help="Log experiment results to neptune")
@@ -227,6 +205,7 @@ if __name__ == "__main__":
     hidden_layers = args["hidden"]
     selector_str = args["selector"]
     lr = args["learning_rate"]
+    backbone = args["backbone"]
     
     # Add training parameters to neptune
     neptune_logger = NeptuneLogger(enable_run=args["neptune"], project=args["project"], run_name_or_id=args["name"])
@@ -234,6 +213,8 @@ if __name__ == "__main__":
     neptune_logger.param("n_videos_batch", n_videos_batch)
     neptune_logger.param("n_samples_per_class", n_samples_per_video_batch)
     neptune_logger.param("features", out_features)
+    neptune_logger.param("backbone", backbone)
+    neptune_logger.param("hidden layers", str(hidden_layers))
     neptune_logger.param("selector", selector_str)
     neptune_logger.param("lr", lr)
     neptune_logger.tags(["TrainIdentifier"])
