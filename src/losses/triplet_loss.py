@@ -161,7 +161,7 @@ class OnlineTripletLoss(nn.Module):
         
         ap_distances_mean = ap_distances.mean().item()
         an_distances_mean = an_distances.mean().item()
-        return losses.mean(), len(triplets), ap_distances_mean, an_distances_mean
+        return losses.mean(), len(triplets), ap_distances_mean, an_distances_mean, triplets
 
 
 class AllTripletSelector(TripletSelector):
