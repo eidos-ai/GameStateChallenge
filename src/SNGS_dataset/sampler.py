@@ -77,13 +77,8 @@ if __name__ == "__main__":
 
     print(f"Number of batches: {len(sampler)}")
 
-    # batch_idx_limit = 5
+    batch_idx_limit = 5
     for batch_idx, data in enumerate(loader):
-    # for batch_idx, (images, labels) in enumerate(loader):
-        
-        # if batch_idx == batch_idx_limit:
-        #     break
+        if batch_idx == batch_idx_limit:
+            break
         print(data)
-        # print(f"model input size: {images.shape}")
-        # print(f"labels size: {labels['role_id'].shape}")
-        print("//////////////////////////")

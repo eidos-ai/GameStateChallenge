@@ -125,28 +125,21 @@ if __name__ == "__main__":
 
     sys.path.append("..")
     sys.path.append("../models")
-    # sys.path.append("/Users/francisco/Documents/GameStateChallenge")
-    # sys.path.append("/Users/francisco/Documents/GameStateChallenge/src")
-    # sys.path.append("/Users/francisco/Documents/GameStateChallenge/src/models")
     from models.resnet import TRANSFORM
 
+    games = ["SNGS-116", "SNGS-132", "SNGS-187"]
+
     dataset = SoccerNetGSDataset(
-        "../../data/SoccerNetGS/train",
-        games_list=["SNGS-175", "SNGS-111", "SNGS-050", "SNGS-077"],
+        "../../data/SoccerNetGS/test",
+        games_list=games,
         transform=TRANSFORM,
     )
 
-    # dataset = SoccerNetGSDataset(
-    #     "data/SoccerNetGS/train",
-    #     games_list=["SNGS-175", "SNGS-111", "SNGS-050", "SNGS-077"],
-    #     transform=TRANSFORM,
-    # )
-
     print(f"Dataset lenght: {len(dataset)}")
-    idx_th = 100000
+    idx_th = 10000
     for idx, dataset_item in tqdm(enumerate(dataset), total=len(dataset)):
         crop, label = dataset_item
-        if label["video"] != "SNGS-111" and label["video"] != "SNGS-077":
+        if label["video"] not in games:
             print("error in video name", label["video"])
 
         if idx == idx_th:
