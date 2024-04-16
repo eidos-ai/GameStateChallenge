@@ -4,6 +4,7 @@ sys.path.append("./models")
 sys.path.append("./losses")
 from pathlib import Path
 import torch
+import copy
 from tqdm import tqdm
 import numpy as np
 import logging
@@ -33,22 +34,21 @@ def fit(train_loader, val_loader, model, loss_fn, optimizer, scheduler, n_epochs
     Siamese network: Siamese loader, siamese model, contrastive loss
     Online triplet learning: batch loader, embedding model, online triplet loss
     """
-    for epoch in range(0, start_epoch):
-        scheduler.step()
+    # for epoch in range(0, start_epoch):
+    #     scheduler.step()
 
     best_accuracy = 0
+    best_valid_loss = 100
     for epoch in range(start_epoch, n_epochs):
-        scheduler.step()
-
         # Train stage
         train_loss, _ = train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, metrics, neptune_logger)
+        scheduler.step()
         neptune_logger.log("train_loss", train_loss)
         message = 'Epoch: {}/{}. Train set: Average loss: {:.4f}'.format(epoch + 1, n_epochs, train_loss)
         # for metric in metrics:
         #     message += '\t{}: {}'.format(metric.name(), metric.value())
 
         valid_loss, _ = valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger)
-        valid_loss /= len(val_loader)
         neptune_logger.log("valid_loss", valid_loss)
         message += '\nEpoch: {}/{}. Validation set: Average loss: {:.4f}'.format(epoch + 1, n_epochs,
                                                                                  valid_loss)
@@ -61,12 +61,12 @@ def fit(train_loader, val_loader, model, loss_fn, optimizer, scheduler, n_epochs
         #     neptune_logger.log("Accuracy", accuracy)
         #     message += '\t{}: {}'.format("Accuracy", round(accuracy, 3))
         
-        # if accuracy > best_accuracy:
-        #     best_model = copy.deepcopy(model)
-        #     best_accuracy = accuracy
+        if valid_loss < best_valid_loss:
+            best_model = copy.deepcopy(model)
+            best_valid_loss = valid_loss
 
         print(message)
-    return model
+    return best_model
         
 
 
@@ -77,7 +77,8 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
     model.train()
     losses = []
     total_loss = 0
-
+    ap_distances = []
+    an_distances = []
     for batch_idx, (images, labels) in enumerate(train_loader):
         logger.debug(f"batch image shape {images.shape}")
         labels = labels["role_id"] if len(labels) > 0 else None
@@ -105,19 +106,23 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
         # for metric in metrics:
         #     metric(outputs_images, target, loss_outputs)
         ap_distance = loss_outputs[2]
+        ap_distances.append(ap_distance)
         an_distance = loss_outputs[3]
-        neptune_logger.log("ap_distance_train", ap_distance)
-        neptune_logger.log("an_distance_train", an_distance)
+        an_distances.append(an_distance)
         
-        if batch_idx % log_interval == 0:
+        if (batch_idx % log_interval == 0) or (batch_idx + 1) == len(train_loader):
             message = 'Train: [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 batch_idx * len(images), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), np.mean(losses))
             for metric in metrics:
                 message += '\t{}: {}'.format(metric.name(), metric.value())
-            message += '\t Ap Distance: {:.6f}, An Distance {:.6f}'.format(ap_distance, an_distance)
+            message += '\t Ap Distance: {:.6f}, An Distance {:.6f}'.format(np.mean(ap_distances), np.mean(an_distances))
             print(message)
+            neptune_logger.log("ap_distance_train", np.mean(ap_distances))
+            neptune_logger.log("an_distance_train", np.mean(an_distances))
             losses = []
+            ap_distances = []
+            an_distances = []
 
     total_loss /= (batch_idx + 1)
     return total_loss, metrics
@@ -128,6 +133,9 @@ def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger):
             metric.reset()
         model.eval()
         val_loss = 0
+        losses = []
+        ap_distances = []
+        an_distances = []
         for batch_idx, (images, labels) in enumerate(val_loader):
             logger.debug(f"batch image shape {images.shape}")
             labels = labels["role_id"] if len(labels) > 0 else None
@@ -138,12 +146,27 @@ def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger):
 
             loss_outputs = loss_fn(embeddings, labels)
             loss = loss_outputs[0] if type(loss_outputs) in (tuple, list) else loss_outputs
+            losses.append(loss.item())
             val_loss += loss.item()
             
             ap_distance = loss_outputs[2]
+            ap_distances.append(ap_distance)
             an_distance = loss_outputs[3]
-            neptune_logger.log("ap_distance_valid", ap_distance)
-            neptune_logger.log("an_distance_valid", an_distance)
+            an_distances.append(an_distance)
+            
+            if (batch_idx % log_interval == 0) or (batch_idx + 1) == len(val_loader):
+                message = 'Valid: [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                    batch_idx * len(images), len(val_loader.dataset),
+                    100. * batch_idx / len(val_loader), np.mean(losses))
+                for metric in metrics:
+                    message += '\t{}: {}'.format(metric.name(), metric.value())
+                message += '\t Ap Distance: {:.6f}, An Distance {:.6f}'.format(np.mean(ap_distances), np.mean(an_distances))
+                print(message)
+                neptune_logger.log("ap_distance_train", np.mean(ap_distances))
+                neptune_logger.log("an_distance_train", np.mean(an_distances))
+                losses = []
+                ap_distances = []
+                an_distances = []
 
 
             # for metric in metrics:
@@ -176,7 +199,7 @@ if __name__ == "__main__":
     
     parser.add_argument("--backbone", required=False, type=str, default="resnet18", help="Resnet arch to use as backbone")
     parser.add_argument("--out_features", required=False, type=int, default=64, help="MLP output features")
-    parser.add_argument("--hidden", required=False, type=parse_int_list, default=[256, 128], help="MLP hidden layers as comma-separated list of integers")
+    parser.add_argument("--hidden", required=False, type=parse_int_list, default=[], help="MLP hidden layers as comma-separated list of integers")
 
     parser.add_argument("--neptune", required=False, action="store_true", default=False, help="Log experiment results to neptune")
     parser.add_argument("--project", required=False, type=str, default="eidos/GameStateChallenge", help="The name of the project")
@@ -228,7 +251,7 @@ if __name__ == "__main__":
     kwargs = {'num_workers': 4, 'pin_memory': True} if device == "cuda" else {}
     
     # Load adequate model and transform for input
-    model = ResnetMLP("resnet18", mlp_hidden_layers=hidden_layers, mlp_output_size=out_features).to(device)
+    model = ResnetMLP(backbone, mlp_hidden_layers=hidden_layers, mlp_output_size=out_features).to(device)
     transform = RESNET_TRANSFORM
         
     total_params = sum(p.numel() for p in model.parameters())
