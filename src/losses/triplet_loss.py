@@ -115,13 +115,16 @@ class SoccerPersonTripletSelector(TripletSelector):
                 continue
             negative_indices = np.where(np.logical_not(label_mask))[0]
             anchor_positives = list(combinations(label_indices, 2))  # All anchor-positive pairs
+            logger.debug(f"/////////////// anchor-positive pairs for {label}: {len(anchor_positives)}///////////////")
             anchor_positives = np.array(anchor_positives)
 
             ap_distances = distance_matrix[anchor_positives[:, 0], anchor_positives[:, 1]]
             for anchor_positive, ap_distance in zip(anchor_positives, ap_distances):
                 loss_values = ap_distance - distance_matrix[torch.LongTensor(np.array([anchor_positive[0]])), torch.LongTensor(negative_indices)] + self.margin
                 loss_values = loss_values.data.cpu().numpy()
+                logger.debug(f"{loss_values.shape[0]} loss values, max loss {np.max(loss_values)}")
                 hard_negative = self.negative_selection_fn(loss_values)
+                logger.debug(f"hard_negative selection output: {hard_negative}")
                 if hard_negative is not None:
                     hard_negative = negative_indices[hard_negative]
                     triplets.append([anchor_positive[0], anchor_positive[1], hard_negative])
@@ -161,7 +164,7 @@ class OnlineTripletLoss(nn.Module):
         
         ap_distances_mean = ap_distances.mean().item()
         an_distances_mean = an_distances.mean().item()
-        return losses.mean(), len(triplets), ap_distances_mean, an_distances_mean, triplets
+        return losses.mean(), len(triplets), ap_distances_mean, an_distances_mean, triplets, losses
 
 
 class AllTripletSelector(TripletSelector):
@@ -194,7 +197,7 @@ class AllTripletSelector(TripletSelector):
 
 def hardest_negative(loss_values: np.ndarray):
     hard_negative = np.argmax(loss_values)
-    return hard_negative if loss_values[hard_negative] > 0 else None
+    return hard_negative if loss_values[hard_negative] > 0 else None        
 
 
 def random_hard_negative(loss_values: np.ndarray):
@@ -255,16 +258,19 @@ class FunctionNegativeTripletSelector(TripletSelector):
         return torch.LongTensor(triplets)
 
 
-def HardestNegativeTripletSelector(margin, cpu=False): return SoccerPersonTripletSelector(margin=margin,
-                                                                                 negative_selection_fn=hardest_negative,
-                                                                                 cpu=cpu)
+def HardestNegativeTripletSelector(margin, cpu=False): 
+    return SoccerPersonTripletSelector(margin=margin,
+                                       negative_selection_fn=hardest_negative,
+                                       cpu=cpu)
 
 
-def RandomNegativeTripletSelector(margin, cpu=False): return SoccerPersonTripletSelector(margin=margin,
-                                                                                negative_selection_fn=random_hard_negative,
-                                                                                cpu=cpu)
+def RandomNegativeTripletSelector(margin, cpu=False): 
+    return SoccerPersonTripletSelector(margin=margin,
+                                       negative_selection_fn=random_hard_negative,
+                                       cpu=cpu)
 
 
-def SemihardNegativeTripletSelector(margin, cpu=False): return SoccerPersonTripletSelector(margin=margin,
-                                                                                  negative_selection_fn=lambda x: semihard_negative(x, margin),
-                                                                                  cpu=cpu)
+def SemihardNegativeTripletSelector(margin, cpu=False): 
+    return SoccerPersonTripletSelector(margin=margin,
+                                       negative_selection_fn=lambda x: semihard_negative(x, margin),
+                                       cpu=cpu)
