@@ -1,11 +1,13 @@
-from collections import defaultdict
+import os
 import sys
+import json
+import numpy as np
 sys.path.append("..")
 sys.path.append("../SNGS_dataset")
 from SNGS_dataset.groundtruth_reader import GroundTruthReader
 from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import confusion_matrix
-import numpy as np
+from collections import defaultdict
 
 
 def clustering_accuracy(labels_true, labels_pred):
@@ -37,13 +39,20 @@ class ClusteringEvaluation():
         '''Evaluate clusters predictions against ground truth labels.'''
         gt_reader = GroundTruthReader(self.dataset_path, self.games_list)
         accuracy_dict = defaultdict()
+        if self.games_list is None:
+            self.games_list = [video for video in os.listdir(dataset_path)]
         for video in self.games_list:
+            if video[:5] != "SNGS-":
+                continue
             video_annotations = gt_reader.get_annotations_from_video(video)
             groundtruth = []
             for annotation in video_annotations:
                 groundtruth.append(annotation["role_id"]) # list[role_id]
-            predictions = np.load(f"{self.predictions_directory}/SNGS-{video}_predictions.json").values() # list[cluster_id]
+            with open(os.path.join(self.predictions_directory, f"{video}_predictions.json"), "r") as f:
+                predictions = list(json.load(f).values()) # list[cluster_id]
             overall_acc, per_class_acc = clustering_accuracy(groundtruth, predictions)
+            
+            print(overall_acc, per_class_acc)
         # promediar acc por video, y por clase (sobre todos los videos)
 
 
@@ -78,3 +87,4 @@ if __name__ == "__main__":
     predictions_directory = args["predictions_directory"]
 
     clustering_evaluation = ClusteringEvaluation(dataset_path, games_list, predictions_directory)
+    clustering_evaluation.eval_clustering()
