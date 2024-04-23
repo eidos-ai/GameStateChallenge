@@ -1,46 +1,11 @@
 import os
-import json
 from torch.utils.data import Dataset
 from typing import Optional, Callable
+from groundtruth_reader import GroundTruthReader
 from PIL import Image
-import random
-
-LABELS_MAP = {
-    "player_left": 0,
-    "player_right": 1,
-    "goalkeeper_left": 2,
-    "goalkeeper_right": 3,
-    "referee": 4,
-    "other": 5,
-}
-
-
-def map_role_id(annotation: dict) -> int:
-    role_id = None
-    role = annotation["attributes"]["role"]
-    if role == "player":
-        role_id = (
-            LABELS_MAP["player_left"]
-            if annotation["attributes"]["team"] == "left"
-            else LABELS_MAP["player_right"]
-        )
-    elif role == "goalkeeper":
-        role_id = (
-            LABELS_MAP["goalkeeper_left"]
-            if annotation["attributes"]["team"] == "left"
-            else LABELS_MAP["goalkeeper_right"]
-        )
-    elif role == "referee":
-        role_id = LABELS_MAP["referee"]
-    elif role == "other":
-        role_id = LABELS_MAP["other"]
-    else:
-        role_id = -1
-    return role_id
 
 
 class SoccerNetGSDataset(Dataset):
-
     def __init__(
         self,
         dataset_path: str,
@@ -52,50 +17,9 @@ class SoccerNetGSDataset(Dataset):
         self.transform = transform
         self.target_transform = target_transform
 
-        person_categories = [
-            1,
-            2,
-            3,
-            7,
-        ]  # 1: player, 2: goalkeeper, 3: referee, 7: other
-        self.labels = []
-        for video in os.listdir(self.dataset_path):
-            if games_list and video not in games_list:
-                continue
-            video_path = os.path.join(self.dataset_path, video)
-            if not os.path.isdir(video_path):
-                continue
-            try:
-                labels_data = json.load(
-                    open(os.path.join(video_path, "Labels-GameState.json"))
-                )
-            except FileNotFoundError:
-                continue
-            for annotation in labels_data["annotations"]:
-                if annotation["category_id"] not in person_categories:
-                    continue
-                role_id = map_role_id(annotation)
-                self.labels.append(
-                    {
-                        "annotation_id": annotation["id"],
-                        "video": video,
-                        "image_id": annotation["image_id"],
-                        "track_id": annotation["track_id"],
-                        "role": annotation["attributes"]["role"],
-                        "team": (
-                            annotation["attributes"]["team"]
-                            if annotation["attributes"]["team"]
-                            else ""
-                        ),
-                        "role_id": role_id,
-                        "bbox": {
-                            "x": annotation["bbox_image"]["x"],
-                            "y": annotation["bbox_image"]["y"],
-                            "w": annotation["bbox_image"]["w"],
-                            "h": annotation["bbox_image"]["h"],
-                        },
-                    }
-                )
+        gt_reader = GroundTruthReader(dataset_path, games_list)
+        # pasarlo a dict ya que es un dataclass
+        self.labels = gt_reader.get_annotations()
 
     def __len__(self) -> int:
         return len(self.labels)
@@ -122,7 +46,6 @@ class SoccerNetGSDataset(Dataset):
 if __name__ == "__main__":
     import sys
     from tqdm import tqdm
-
     sys.path.append("..")
     sys.path.append("../models")
     from models.resnet import TRANSFORM
