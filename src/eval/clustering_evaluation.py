@@ -1,6 +1,6 @@
+from dataclasses import asdict
 import os
 import sys
-import json
 import numpy as np
 sys.path.append("..")
 sys.path.append("../SNGS_dataset")
@@ -8,6 +8,9 @@ from SNGS_dataset.groundtruth_reader import GroundTruthReader
 from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import confusion_matrix
 from collections import defaultdict
+from typing import Any
+from clustering import load_embeddings
+from clustering import TeamClustering
 
 
 def clustering_accuracy(labels_true, labels_pred):
@@ -46,45 +49,54 @@ def get_accuracy_average(accuracy_dict):
 
 
 class ClusteringEvaluation():
-    def __init__(self, dataset_path: str, games_list: list[str], predictions_directory: str):
-        self.dataset_path = dataset_path
+    def __init__(self, games_list: list[str]):
         self.games_list = games_list
-        self.predictions_directory = predictions_directory
 
-    def clustering_accuracy(self) -> float:
-        '''Evaluate clusters predictions against ground truth labels.'''
-        gt_reader = GroundTruthReader(self.dataset_path, self.games_list)
+    def videos_clustering_accuracy(self, annotations: list[dict[str: Any]], embeddings: list[Any], teamClustering: TeamClustering) -> dict[str: Any]:
+        '''Evaluates clustering from on-memory data'''
+        assert len(annotations) == len(embeddings), "The annotations and embeddings lists have different lengths"
         accuracy_dict = defaultdict(lambda: defaultdict(list))
-        if self.games_list is None:
-            self.games_list = [video for video in os.listdir(dataset_path)]
         for video in self.games_list:
-            if video[:5] != "SNGS-":
-                continue
-            video_annotations = gt_reader.get_annotations_from_video(video)
-            groundtruth = []
-            for annotation in video_annotations:
-                groundtruth.append(annotation["role_id"]) # list[role_id]
-            with open(os.path.join(self.predictions_directory, f"{video}_predictions.json"), "r") as f:
-                predictions = list(json.load(f).values()) # list[cluster_id]
-
-            # get accuracies
-            overall_acc, per_class_acc = clustering_accuracy(groundtruth, predictions)
-
-            # load them into a dictionary
+            video_embeddings = []
+            video_annotations = []
+            for idx, annotation in enumerate(annotations):
+                if annotation["video"] == video:
+                    video_embeddings.append(embeddings[idx])
+                    video_annotations.append(annotation["role_id"])
+            predictions = teamClustering.fit(video_embeddings)
+            overall_acc, per_class_acc = clustering_accuracy(video_annotations, predictions)
             accuracy_dict[video]["overall"] = overall_acc
             accuracy_dict[video]["per_class"] = defaultdict()
             classes_acc = accuracy_dict[video]["per_class"]
             for class_idx in per_class_acc.keys():
                 classes_acc[int(class_idx)] = per_class_acc[class_idx]
         average_acc_dict = get_accuracy_average(accuracy_dict)
+        return average_acc_dict, accuracy_dict
 
-        print(json.dumps(accuracy_dict, indent=4))
-        print(json.dumps(average_acc_dict, indent=4))
+    def stored_videos_clustering_accuracy(self, dataset_path: str, embeddings_directory: str) -> dict[str: Any]:
+        '''Loads data to evaluate clustering'''
+        gt_reader = GroundTruthReader(dataset_path, self.games_list)
+        if self.games_list is None:
+            self.games_list = [video for video in os.listdir(dataset_path)]
+        groundtruth = []
+        embeddings = []
+        for video in self.games_list:
+            if video[:5] != "SNGS-":
+                continue
+            video_annotations = gt_reader.get_annotations_from_video(video)
+            for annotation in video_annotations:
+                groundtruth.append(asdict(annotation))
+            _, video_embeddings = load_embeddings(embeddings_directory, video)
+            for embedding in video_embeddings:
+                embeddings.append(embedding)
+        team_clustering = TeamClustering()
+        average_acc_dict, accuracy_dict = self.videos_clustering_accuracy(groundtruth, embeddings, team_clustering)
         return average_acc_dict, accuracy_dict
 
 
 if __name__ == "__main__":
     import argparse
+    import json
 
     parser = argparse.ArgumentParser(description="Script for clustering evaluation.")
     parser.add_argument(
@@ -102,16 +114,19 @@ if __name__ == "__main__":
         help="List of games to use for clustering evaluation",
     )
     parser.add_argument(
-        "--predictions_directory",
+        "--embeddings_directory",
         type=str,
         required=False,
         default="./video_files",
-        help="Directory where the 'SNGS-XXX_predictions.json' files are.",
+        help="Directory where the embeddings (npz files) are.",
     )
     args = vars(parser.parse_args())
     dataset_path = args["dataset_path"]
     games_list = args["games_list"]
-    predictions_directory = args["predictions_directory"]
+    embeddings_directory = args["embeddings_directory"]
 
-    clustering_evaluation = ClusteringEvaluation(dataset_path, games_list, predictions_directory)
-    clustering_evaluation.clustering_accuracy()
+    clustering_evaluation = ClusteringEvaluation(games_list)
+    average_acc_dict, accuracy_dict = clustering_evaluation.stored_videos_clustering_accuracy(dataset_path,
+                                                                                              embeddings_directory)
+    print(json.dumps(accuracy_dict, indent=4))
+    print(json.dumps(average_acc_dict, indent=4))

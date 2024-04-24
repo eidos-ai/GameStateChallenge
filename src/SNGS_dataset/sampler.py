@@ -161,4 +161,3 @@ if __name__ == "__main__":
 
     assert compare_lists_of_dicts(dataset.labels, returned_labels), "Returned labels don't match with dataset labels"
     assert batch_idx + 1 == len(sampler), f"Incorrect number of returned batches, expected {len(sampler)} and got {batch_idx + 1}"
-        

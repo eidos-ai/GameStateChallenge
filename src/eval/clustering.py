@@ -5,6 +5,13 @@ import torch
 from collections import defaultdict
 from sklearn.cluster import KMeans
 
+def load_embeddings(embeddings_directory: str, video_name: str) -> list[torch.FloatTensor]:
+        '''Load embeddings from a given video'''
+        embeddings_file_path = os.path.join(embeddings_directory, f"{video_name}_embeddings.npz")
+        with np.load(embeddings_file_path) as data:
+            annotation_ids = data['annotation_ids']
+            embeddings = data['embeddings']
+        return annotation_ids, embeddings
 
 class TeamClustering():
     def __init__(self, clustering_method: str="kmeans", n_clusters: int=5):
@@ -12,14 +19,6 @@ class TeamClustering():
         self.n_clusters = n_clusters
         if clustering_method == "kmeans":
             self.clustering = KMeans(n_clusters=self.n_clusters, random_state=0)
-
-    def load_embeddings(self, embeddings_directory: str, video_name: str) -> list[torch.FloatTensor]:
-        '''Load embeddings from a given video'''
-        embeddings_file_path = os.path.join(embeddings_directory, f"{video_name}_embeddings.npz")
-        with np.load(embeddings_file_path) as data:
-            annotation_ids = data['annotation_ids']
-            embeddings = data['embeddings']
-        return annotation_ids, embeddings
 
     def fit(self, embeddings: dict[str, int | torch.FloatTensor]) -> list[int]:
         '''Clusters from given embeddings'''
@@ -49,7 +48,7 @@ class TeamClustering():
             video_path = os.path.join(dataset_path, video)
             if not os.path.isdir(video_path):
                 continue
-            annotation_ids, embeddings = self.load_embeddings(embeddings_directory, video)
+            annotation_ids, embeddings = load_embeddings(embeddings_directory, video)
             predictions = self.fit(embeddings)
             self.export_predictions(video, annotation_ids, predictions, output_directory)
 
