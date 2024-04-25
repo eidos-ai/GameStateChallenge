@@ -20,12 +20,9 @@ def model_run(loader, model, device, output_directory):
     annotations_per_video = defaultdict(lambda: defaultdict(list))
     # No need to calculate gradients as it's an eval
     with torch.no_grad():
+        model.eval()
         # Iterate over every batch
-        for batch_idx, (images, labels) in tqdm(
-            enumerate(loader),
-            desc="Generating embeddings from every batch",
-            total=len(loader),
-        ):
+        for batch_idx, (images, labels) in tqdm(enumerate(loader), desc="Generating embeddings from every batch", total=len(loader)):
             # Get embeddings from batch of images
             images = images.to(device)
             embeddings = model(images)
@@ -34,13 +31,8 @@ def model_run(loader, model, device, output_directory):
             batch_size = images.shape[0]
             for batch_element_idx in range(batch_size):
                 video = labels["video"][batch_element_idx]
-                if embeddings_per_video[video]["annotation_ids"] is None:
-                    embeddings_per_video[video]["annotation_ids"] = []
                 embeddings_per_video[video]["annotation_ids"].append(labels["annotation_id"][batch_element_idx])
-                if embeddings_per_video[video]["embeddings"] is None:
-                    embeddings_per_video[video]["embeddings"] = []
                 embeddings_per_video[video]["embeddings"].append(embeddings_array[batch_element_idx])
-
     os.makedirs(output_directory, exist_ok=True)
     for video, data in embeddings_per_video.items():
         annotation_ids = np.array(data["annotation_ids"])
