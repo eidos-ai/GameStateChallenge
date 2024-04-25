@@ -1,7 +1,8 @@
 import os
 import json
 from typing import Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
+import pandas as pd
 
 
 LABELS_MAP = {
@@ -55,6 +56,8 @@ class GroundTruthReader:
         self.dataset_path = dataset_path
         self.games_list = games_list
         self.person_categories = [1, 2, 3, 7]  # 1: player, 2: goalkeeper, 3: referee, 7: other
+        self.annotations = self.get_annotations()
+        self.annotations_df = pd.DataFrame([asdict(ann) for ann in self.annotations])
 
     def get_annotations(self) -> list[Annotation]:
         annotations = []
@@ -92,7 +95,7 @@ class GroundTruthReader:
     
     def get_annotations_from_video(self, video: str) -> list[dict[str, Any]]:
         video_annotations = []
-        for annotation in self.get_annotations():
+        for annotation in self.annotations:
             if annotation.video == video:
                 video_annotations.append(annotation)
         return video_annotations
