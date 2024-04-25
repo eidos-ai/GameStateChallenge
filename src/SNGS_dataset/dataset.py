@@ -20,7 +20,7 @@ class SoccerNetGSDataset(Dataset):
         self.labels = []
 
         gt_reader = GroundTruthReader(dataset_path, games_list)
-        for annotation in gt_reader.get_annotations(): # returns list of Annotation objects
+        for annotation in gt_reader.annotations: # returns list of Annotation objects
             annotation_dict = asdict(annotation)
             self.labels.append(annotation_dict)
 
