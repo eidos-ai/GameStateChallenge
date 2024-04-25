@@ -54,7 +54,7 @@ class ClusteringEvaluation():
 
     def videos_clustering_accuracy(self, annotations: list[dict[str: Any]], embeddings: list[Any], teamClustering: TeamClustering) -> dict[str: Any]:
         '''Evaluates clustering from on-memory data'''
-        assert len(annotations) == len(embeddings), "The annotations and embeddings lists have different lengths"
+        assert len(annotations) == len(embeddings), f"The annotations ({len(annotations)}) and embeddings ({len(embeddings)}) lists have different lengths"
         accuracy_dict = defaultdict(lambda: defaultdict(list))
         for video in self.games_list:
             video_embeddings = []
@@ -84,6 +84,7 @@ class ClusteringEvaluation():
             if video[:5] != "SNGS-":
                 continue
             video_annotations = gt_reader.get_annotations_from_video(video)
+            print(f"Now evaluating video {video}")
             for annotation in video_annotations:
                 groundtruth.append(asdict(annotation))
             _, video_embeddings = load_embeddings(embeddings_directory, video)

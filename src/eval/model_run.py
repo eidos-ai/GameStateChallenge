@@ -55,7 +55,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Script for model inference.")
     parser.add_argument(
         "-m",
-        "--model_path",  # /home/enzo/GameStateChallenge/src/experiments/identifier/GAM-127/trained_model.pt
+        "--model_path",
         type=str,
         required=True,
         help="Path to the model used for inference",
