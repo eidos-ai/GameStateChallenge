@@ -210,7 +210,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--neptune", required=False, action="store_true", default=False, help="Log experiment results to neptune")
     parser.add_argument("--project", required=False, type=str, default="eidos/GameStateChallenge", help="The name of the project")
-    parser.add_argument("--out_dir", required=False, type=str, default="experiments/identifier", help="Path to the directory where a directory will be created to store output from this experiment")
+    parser.add_argument("--out_dir", required=False, type=str, default="../experiments/identifier", help="Path to the directory where a directory will be created to store output from this experiment")
     parser.add_argument("--name", required=False, type=str, help="The name of the experiment")
     
     args = vars(parser.parse_args())
