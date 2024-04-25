@@ -80,6 +80,7 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
         total_anns += images.shape[0]
         logger.debug(f"batch image shape {images.shape}")
         labels = labels["role_id"] if len(labels) > 0 else None
+        videos_ids = labels["video"] if len(labels) > 0 else None
         
         logger.debug(f"Moving to device")
         
@@ -92,7 +93,7 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
         
         _ , embeddings = model(images)
 
-        loss_outputs = loss_fn(embeddings, labels)
+        loss_outputs = loss_fn(embeddings, labels, videos_ids)
         
         logger.debug("loss")
         loss = loss_outputs[0] if type(loss_outputs) in (tuple, list) else loss_outputs
@@ -134,13 +135,14 @@ def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger):
             all_labels.extend(convert_dict_to_list(labels))
             labels = labels["role_id"] if len(labels) > 0 else None
             labels = labels.to(device)
+            videos_ids = labels["video"] if len(labels) > 0 else None
             
             images = images.to(device)
 
             embeddings = model(images)
             all_embeddings.extend(embeddings.cpu().numpy().tolist())
 
-            loss_outputs = loss_fn(embeddings, labels)
+            loss_outputs = loss_fn(embeddings, labels, videos_ids)
             loss = loss_outputs[0] if type(loss_outputs) in (tuple, list) else loss_outputs
             losses.append(loss.item())
             val_loss += loss.item()
