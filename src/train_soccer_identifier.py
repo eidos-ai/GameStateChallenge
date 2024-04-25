@@ -1,27 +1,34 @@
+from typing import List
 import sys
 sys.path.append("./SNGS_dataset")
 sys.path.append("./models")
 sys.path.append("./losses")
+sys.path.append("./eval")
 from pathlib import Path
 import torch
 import copy
 from tqdm import tqdm
 import numpy as np
 import logging
+import json
 
 from gsr.utils.neptune_logger import NeptuneLogger
 
 from SNGS_dataset.dataset import SoccerNetGSDataset
-from SNGS_dataset.sampler import SoccerNetGSBatchSampler
+from SNGS_dataset.sampler import SoccerNetGSBatchSampler, convert_dict_to_list
 from losses.triplet_loss import OnlineTripletLoss, TripletSelector, RandomNegativeTripletSelector, HardestNegativeTripletSelector, SemihardNegativeTripletSelector
 from losses.triplet_loss import distance as triplet_loss_distance
 
 from models.resnet import ResnetMLP
 from models.resnet import TRANSFORM as RESNET_TRANSFORM
 
+from eval.clustering import TeamClustering
+from eval.clustering_evaluation import ClusteringEvaluation
+
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+    
 
 def fit(train_loader, val_loader, model, loss_fn, optimizer, scheduler, n_epochs, device, log_interval, metrics=[],
         start_epoch=0, neptune_logger: NeptuneLogger=None, inference_transform=None):
@@ -34,52 +41,43 @@ def fit(train_loader, val_loader, model, loss_fn, optimizer, scheduler, n_epochs
     Siamese network: Siamese loader, siamese model, contrastive loss
     Online triplet learning: batch loader, embedding model, online triplet loss
     """
-    # for epoch in range(0, start_epoch):
-    #     scheduler.step()
 
     best_accuracy = 0
-    best_valid_loss = 100
+    best_clustering_acc = 0
     for epoch in range(start_epoch, n_epochs):
         # Train stage
         train_loss, _ = train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, metrics, neptune_logger)
         scheduler.step()
         neptune_logger.log("train_loss", train_loss)
         message = 'Epoch: {}/{}. Train set: Average loss: {:.4f}'.format(epoch + 1, n_epochs, train_loss)
-        # for metric in metrics:
-        #     message += '\t{}: {}'.format(metric.name(), metric.value())
 
-        valid_loss, _ = valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger)
+        valid_loss, average_acc_dict, accuracy_dict = valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger)
         neptune_logger.log("valid_loss", valid_loss)
         message += '\nEpoch: {}/{}. Validation set: Average loss: {:.4f}'.format(epoch + 1, n_epochs,
                                                                                  valid_loss)
-        # for metric in metrics:
-        #     message += '\t{}: {}'.format(metric.name(), metric.value())
+        print(json.dumps(average_acc_dict, indent=4))
+        clustering_acc = average_acc_dict["overall"]
+        neptune_logger.log("Clustering accuracy", clustering_acc)
+        for cluster_id, cluster_acc in average_acc_dict["per_class"].items():
+            neptune_logger.log(f"{cluster_id} accuracy", cluster_acc)
         
-        # if (epoch % 5 == 0) or (epoch == n_epochs - 1):
-        #     # accuracy = accuracy_eval.eval_identifier(model, inference_transform, euclidean_distance)
-        #     accuracy = accuracy_eval.eval_identifier(model, inference_transform, triplet_loss_distance)
-        #     neptune_logger.log("Accuracy", accuracy)
-        #     message += '\t{}: {}'.format("Accuracy", round(accuracy, 3))
-        
-        if valid_loss < best_valid_loss:
+        if clustering_acc > best_clustering_acc:
             best_model = copy.deepcopy(model)
-            best_valid_loss = valid_loss
+            best_clustering_acc = clustering_acc
 
         print(message)
     return best_model
-        
 
 
 def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, metrics, neptune_logger):
-    # for metric in metrics:
-    #     metric.reset()
-
     model.train()
     losses = []
     total_loss = 0
     ap_distances = []
     an_distances = []
+    total_anns = 0
     for batch_idx, (images, labels) in enumerate(train_loader):
+        total_anns += images.shape[0]
         logger.debug(f"batch image shape {images.shape}")
         labels = labels["role_id"] if len(labels) > 0 else None
         
@@ -103,19 +101,14 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
         loss.backward()
         optimizer.step()
         
-        # for metric in metrics:
-        #     metric(outputs_images, target, loss_outputs)
         ap_distance = loss_outputs[2]
         ap_distances.append(ap_distance)
         an_distance = loss_outputs[3]
         an_distances.append(an_distance)
-        
-        if (batch_idx % log_interval == 0) or (batch_idx + 1) == len(train_loader):
+        if (batch_idx % log_interval == 0) or (total_anns == len(train_loader.dataset)):
             message = 'Train: [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                batch_idx * len(images), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), np.mean(losses))
-            for metric in metrics:
-                message += '\t{}: {}'.format(metric.name(), metric.value())
+                total_anns, len(train_loader.dataset),
+                100. * total_anns / len(train_loader.dataset), np.mean(losses))
             message += '\t Ap Distance: {:.6f}, An Distance {:.6f}'.format(np.mean(ap_distances), np.mean(an_distances))
             print(message)
             neptune_logger.log("ap_distance_train", np.mean(ap_distances))
@@ -129,20 +122,23 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
 
 def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger):
     with torch.no_grad():
-        for metric in metrics:
-            metric.reset()
         model.eval()
         val_loss = 0
         losses = []
         ap_distances = []
         an_distances = []
+        all_embeddings = []
+        all_labels = []
         for batch_idx, (images, labels) in enumerate(val_loader):
             logger.debug(f"batch image shape {images.shape}")
+            all_labels.extend(convert_dict_to_list(labels))
             labels = labels["role_id"] if len(labels) > 0 else None
             labels = labels.to(device)
+            
             images = images.to(device)
 
             embeddings = model(images)
+            all_embeddings.extend(embeddings.cpu().numpy().tolist())
 
             loss_outputs = loss_fn(embeddings, labels)
             loss = loss_outputs[0] if type(loss_outputs) in (tuple, list) else loss_outputs
@@ -154,25 +150,27 @@ def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger):
             an_distance = loss_outputs[3]
             an_distances.append(an_distance)
             
-            if (batch_idx % log_interval == 0) or (batch_idx + 1) == len(val_loader):
+            if (batch_idx % log_interval == 0) or (len(all_labels) == len(val_loader.dataset)):
                 message = 'Valid: [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    batch_idx * len(images), len(val_loader.dataset),
-                    100. * batch_idx / len(val_loader), np.mean(losses))
-                for metric in metrics:
-                    message += '\t{}: {}'.format(metric.name(), metric.value())
+                    len(all_labels), len(val_loader.dataset),
+                    100. * len(all_labels) / len(val_loader.dataset), np.mean(losses))
                 message += '\t Ap Distance: {:.6f}, An Distance {:.6f}'.format(np.mean(ap_distances), np.mean(an_distances))
                 print(message)
-                neptune_logger.log("ap_distance_train", np.mean(ap_distances))
-                neptune_logger.log("an_distance_train", np.mean(an_distances))
+                neptune_logger.log("ap_distance_valid", np.mean(ap_distances))
+                neptune_logger.log("an_distance_valid", np.mean(an_distances))
                 losses = []
                 ap_distances = []
                 an_distances = []
 
-
-            # for metric in metrics:
-            #     metric(outputs, target, loss_outputs)
+        # perform clustering
+        clustering_method = TeamClustering()
+        games_list = list({entry['video'] for entry in all_labels if 'video' in entry})
+        print(f"running evaluation on {games_list}")
+        average_acc_dict, accuracy_dict = ClusteringEvaluation(games_list=games_list).videos_clustering_accuracy(all_labels, 
+                                                                                                                 all_embeddings,
+                                                                                                                 clustering_method)
         val_loss /= (batch_idx + 1)
-    return val_loss, metrics
+    return val_loss, average_acc_dict, accuracy_dict
 
 # Custom function to parse a comma-separated list of integers
 def parse_int_list(arg):
@@ -189,8 +187,17 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('-t', '--train', required=True, help='Path to directory with SoccerNetGSR train split')
+    parser.add_argument('-tgl', "--train_games_list", required=False, type=str, nargs="+",
+                        default=["SNGS-060", "SNGS-061", "SNGS-063", "SNGS-065"], 
+                        help="Video names to use on the train dataset")
     parser.add_argument('-te', '--test', required=False, help='Path to directory with SoccerNetGSR test split')
+    parser.add_argument('-tegl', "--test_games_list", required=False, type=str, nargs="+",
+                        default=["SNGS-067"],
+                        help="Video names to use on the test dataset")
     parser.add_argument('-v', '--valid', required=True, help='Path to directory with SoccerNetGSR valid split')
+    parser.add_argument('-vgl', "--valid_games_list", required=False, type=str, nargs="+", 
+                        default=["SNGS-067"], 
+                        help="Video names to use on the valid dataset")
     parser.add_argument('-e', '--epochs', type=int, required=False, default=5, help='number of epochs to train model')
     parser.add_argument('-lr', '--learning_rate', type=float, required=False, default=1e-4, help='optimizer learning rate')
     parser.add_argument('--n_videos', type=int, required=False, default=1, help='number of different videos per batch')
@@ -229,6 +236,9 @@ if __name__ == "__main__":
     selector_str = args["selector"]
     lr = args["learning_rate"]
     backbone = args["backbone"]
+    train_games = args["train_games_list"]
+    valid_games = args["valid_games_list"]
+    test_games = args["test_games_list"]
     
     # Add training parameters to neptune
     neptune_logger = NeptuneLogger(enable_run=args["neptune"], project=args["project"], run_name_or_id=args["name"])
@@ -260,14 +270,20 @@ if __name__ == "__main__":
     neptune_logger.param("Trainable parameters", trainable_params)
 
     logger.info("Creating train dataset and dataloader")
-    train_dataset = SoccerNetGSDataset(train_dataset_path, transform=transform, games_list=["SNGS-060", "SNGS-097", "SNGS-151"])
+    train_dataset = SoccerNetGSDataset(train_dataset_path, transform=transform, games_list=train_games)
     train_batch_sampler = SoccerNetGSBatchSampler(train_dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_per_video_batch)
     online_train_loader = torch.utils.data.DataLoader(train_dataset, batch_sampler=train_batch_sampler, **kwargs)
+    neptune_logger.param("train_path", train_dataset_path)
+    logger.info(f"Train dataset created with {str(train_games)}")
+    neptune_logger.param("train games", str(train_games))
     
     logger.info("Creating validation dataset and dataloader")
-    valid_dataset = SoccerNetGSDataset(valid_dataset_path, transform=transform, games_list=["SNGS-021", "SNGS-039", "SNGS-078"])
+    valid_dataset = SoccerNetGSDataset(valid_dataset_path, transform=transform, games_list=valid_games)
     valid_batch_sampler = SoccerNetGSBatchSampler(valid_dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_per_video_batch)
     online_valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_sampler=valid_batch_sampler, **kwargs)
+    neptune_logger.param("valid_path", valid_dataset_path)
+    logger.info(f"Valid dataset created with {str(valid_games)}")
+    neptune_logger.param("valid games", str(valid_games))
     
     margin = 1.
     selector_class: TripletSelector = None
@@ -285,7 +301,7 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 8, gamma=0.1, last_epoch=-1)
     n_epochs = epochs
-    log_interval = 100
+    log_interval = 30
     
     trained_model = fit(online_train_loader, online_valid_loader, model, 
         loss_fn, optimizer, scheduler, n_epochs, device, 
