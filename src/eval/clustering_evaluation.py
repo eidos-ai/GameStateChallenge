@@ -11,12 +11,12 @@ from collections import defaultdict
 from typing import Any
 from clustering import load_embeddings
 from clustering import TeamClustering
+from tqdm import tqdm
 
 
 def clustering_accuracy(labels_true, labels_pred):
     # Create the confusion matrix
     cm = confusion_matrix(labels_true, labels_pred, labels=[0, 1, 2, 3, 4])
-    print(cm)
 
     # Find the optimal one-to-one mapping between cluster labels and true labels
     row_ind, col_ind = linear_sum_assignment(cm, maximize=True)
@@ -90,11 +90,9 @@ class ClusteringEvaluation():
         
         groundtruth = []
         embeddings = []
-        for video in self.games_list:
+        for video in tqdm(self.games_list, total=len(self.games_list)):
             if video[:5] != "SNGS-":
                 continue
-            print(f"Now evaluating video {video}")
-
             video_gt = gt_reader.get_annotations_from_video(video)
             video_embeddings_annotations_ids, video_embeddings = load_embeddings(embeddings_directory, video)
             for ann_id, embedding in zip(video_embeddings_annotations_ids, video_embeddings):
