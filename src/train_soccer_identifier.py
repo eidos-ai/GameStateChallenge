@@ -51,22 +51,23 @@ def fit(train_loader, val_loader, model, loss_fn, optimizer, scheduler, n_epochs
         neptune_logger.log("train_loss", train_loss)
         message = 'Epoch: {}/{}. Train set: Average loss: {:.4f}'.format(epoch + 1, n_epochs, train_loss)
 
-        valid_loss, average_acc_dict, accuracy_dict = valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger)
+        valid_loss, _, _ = valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger)
         neptune_logger.log("valid_loss", valid_loss)
         message += '\nEpoch: {}/{}. Validation set: Average loss: {:.4f}'.format(epoch + 1, n_epochs,
                                                                                  valid_loss)
-        print(json.dumps(average_acc_dict, indent=4))
-        clustering_acc = average_acc_dict["overall"]
-        neptune_logger.log("Clustering accuracy", clustering_acc)
-        for cluster_id, cluster_acc in average_acc_dict["per_class"].items():
-            neptune_logger.log(f"{cluster_id} accuracy", cluster_acc)
+#         print(json.dumps(average_acc_dict, indent=4))
+#         clustering_acc = average_acc_dict["overall"]
+#         neptune_logger.log("Clustering accuracy", clustering_acc)
+#         for cluster_id, cluster_acc in average_acc_dict["per_class"].items():
+#             neptune_logger.log(f"{cluster_id} accuracy", cluster_acc)
         
-        if clustering_acc > best_clustering_acc:
-            best_model = copy.deepcopy(model)
-            best_clustering_acc = clustering_acc
+#         if clustering_acc > best_clustering_acc:
+#             best_model = copy.deepcopy(model)
+#             best_clustering_acc = clustering_acc
 
         print(message)
-    return best_model
+    # return best_model
+    return model
 
 
 def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, metrics, neptune_logger):
@@ -79,8 +80,8 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
     for batch_idx, (images, labels) in enumerate(train_loader):
         total_anns += images.shape[0]
         logger.debug(f"batch image shape {images.shape}")
-        labels = labels["role_id"] if len(labels) > 0 else None
         videos_ids = labels["video"] if len(labels) > 0 else None
+        labels = labels["role_id"] if len(labels) > 0 else None
         
         logger.debug(f"Moving to device")
         
@@ -114,6 +115,7 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
             print(message)
             neptune_logger.log("ap_distance_train", np.mean(ap_distances))
             neptune_logger.log("an_distance_train", np.mean(an_distances))
+            neptune_logger.log("train_batch_loss", np.mean(losses))
             losses = []
             ap_distances = []
             an_distances = []
@@ -133,9 +135,9 @@ def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger):
         for batch_idx, (images, labels) in enumerate(val_loader):
             logger.debug(f"batch image shape {images.shape}")
             all_labels.extend(convert_dict_to_list(labels))
+            videos_ids = labels["video"] if len(labels) > 0 else None
             labels = labels["role_id"] if len(labels) > 0 else None
             labels = labels.to(device)
-            videos_ids = labels["video"] if len(labels) > 0 else None
             
             images = images.to(device)
 
@@ -165,14 +167,15 @@ def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger):
                 an_distances = []
 
         # perform clustering
-        clustering_method = TeamClustering()
-        games_list = list({entry['video'] for entry in all_labels if 'video' in entry})
-        print(f"running evaluation on {games_list}")
-        average_acc_dict, accuracy_dict = ClusteringEvaluation(games_list=games_list).videos_clustering_accuracy(all_labels, 
-                                                                                                                 all_embeddings,
-                                                                                                                 clustering_method)
+        # clustering_method = TeamClustering()
+        # games_list = list({entry['video'] for entry in all_labels if 'video' in entry})
+        # print(f"running evaluation on {games_list}")
+        # average_acc_dict, accuracy_dict = ClusteringEvaluation(games_list=games_list).videos_clustering_accuracy(all_labels, 
+        #                                                                                                          all_embeddings,
+        #                                                                                                          clustering_method)
         val_loss /= (batch_idx + 1)
-    return val_loss, average_acc_dict, accuracy_dict
+    # return val_loss, average_acc_dict, accuracy_dict
+    return val_loss, None, None
 
 # Custom function to parse a comma-separated list of integers
 def parse_int_list(arg):
