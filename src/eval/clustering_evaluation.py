@@ -15,7 +15,8 @@ from clustering import TeamClustering
 
 def clustering_accuracy(labels_true, labels_pred):
     # Create the confusion matrix
-    cm = confusion_matrix(labels_true, labels_pred)
+    cm = confusion_matrix(labels_true, labels_pred, labels=[0, 1, 2, 3, 4])
+    print(cm)
 
     # Find the optimal one-to-one mapping between cluster labels and true labels
     row_ind, col_ind = linear_sum_assignment(cm, maximize=True)
@@ -26,7 +27,11 @@ def clustering_accuracy(labels_true, labels_pred):
     # Calculate per-class accuracy
     per_class_accuracy = {}
     for i, (row, col) in enumerate(zip(row_ind, col_ind)):
-        class_accuracy = cm[row, col] / np.sum(cm[row, :])
+        row_sum = np.sum(cm[row, :])
+        if row_sum == 0:
+            class_accuracy = None
+        else:
+            class_accuracy = cm[row, col] / row_sum
         per_class_accuracy[row] = class_accuracy
 
     return overall_accuracy, per_class_accuracy
@@ -34,14 +39,18 @@ def clustering_accuracy(labels_true, labels_pred):
 def get_accuracy_average(accuracy_dict):
     '''Get the average accuracy of all videos.'''
     overall_acc = 0
+    per_class_nones = defaultdict(int)
     per_class_acc = defaultdict(float)
     for video in accuracy_dict.keys():
         overall_acc += accuracy_dict[video]["overall"]
         for class_idx in accuracy_dict[video]["per_class"].keys():
+            if accuracy_dict[video]["per_class"][class_idx] is None:
+                per_class_nones[class_idx] += 1
+                continue
             per_class_acc[int(class_idx)] += accuracy_dict[video]["per_class"][class_idx]
     overall_acc /= len(accuracy_dict)
     for class_idx in per_class_acc.keys():
-        per_class_acc[class_idx] /= len(accuracy_dict)
+        per_class_acc[class_idx] /= (len(accuracy_dict) - per_class_nones[class_idx])
     avg_dict = defaultdict(lambda: defaultdict(list))
     avg_dict["overall"] = overall_acc
     avg_dict["per_class"] = per_class_acc
@@ -54,7 +63,7 @@ class ClusteringEvaluation():
 
     def videos_clustering_accuracy(self, annotations: list[dict[str: Any]], embeddings: list[Any], teamClustering: TeamClustering) -> dict[str: Any]:
         '''Evaluates clustering from on-memory data'''
-        assert len(annotations) == len(embeddings), f"The annotations ({len(annotations)}) and embeddings ({len(embeddings)}) lists have different lengths"
+        assert len(annotations) == len(embeddings), "The annotations and embeddings lists have different lengths"
         accuracy_dict = defaultdict(lambda: defaultdict(list))
         for video in self.games_list:
             video_embeddings = []
@@ -63,7 +72,7 @@ class ClusteringEvaluation():
                 if annotation["video"] == video:
                     video_embeddings.append(embeddings[idx])
                     video_annotations.append(annotation["role_id"])
-            predictions = teamClustering.fit(video_embeddings)
+            predictions = teamClustering.fit(video_embeddings, video)
             overall_acc, per_class_acc = clustering_accuracy(video_annotations, predictions)
             accuracy_dict[video]["overall"] = overall_acc
             accuracy_dict[video]["per_class"] = defaultdict()
@@ -75,21 +84,25 @@ class ClusteringEvaluation():
 
     def stored_videos_clustering_accuracy(self, dataset_path: str, embeddings_directory: str) -> dict[str: Any]:
         '''Loads data to evaluate clustering'''
-        gt_reader = GroundTruthReader(dataset_path, self.games_list)
         if self.games_list is None:
             self.games_list = [video for video in os.listdir(dataset_path)]
+        gt_reader = GroundTruthReader(dataset_path, self.games_list)
+        
         groundtruth = []
         embeddings = []
         for video in self.games_list:
             if video[:5] != "SNGS-":
                 continue
-            video_annotations = gt_reader.get_annotations_from_video(video)
             print(f"Now evaluating video {video}")
-            for annotation in video_annotations:
-                groundtruth.append(asdict(annotation))
-            _, video_embeddings = load_embeddings(embeddings_directory, video)
-            for embedding in video_embeddings:
+
+            video_gt = gt_reader.get_annotations_from_video(video)
+            video_embeddings_annotations_ids, video_embeddings = load_embeddings(embeddings_directory, video)
+            for ann_id, embedding in zip(video_embeddings_annotations_ids, video_embeddings):
                 embeddings.append(embedding)
+                for annotation in video_gt:
+                    if annotation.annotation_id == ann_id:
+                        groundtruth.append(asdict(annotation))
+                        break
         team_clustering = TeamClustering()
         average_acc_dict, accuracy_dict = self.videos_clustering_accuracy(groundtruth, embeddings, team_clustering)
         return average_acc_dict, accuracy_dict
