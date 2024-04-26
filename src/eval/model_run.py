@@ -15,7 +15,7 @@ from SNGS_dataset.dataset import SoccerNetGSDataset
 from SNGS_dataset.sampler import SoccerNetGSBatchSampler
 
 
-def model_run(loader, model, device, output_directory):
+def model_run(loader, model, device, output_directory, model_path):
     embeddings_per_video = defaultdict(lambda: defaultdict(list))
     annotations_per_video = defaultdict(lambda: defaultdict(list))
     # No need to calculate gradients as it's an eval
@@ -35,10 +35,11 @@ def model_run(loader, model, device, output_directory):
                 embeddings_per_video[video]["embeddings"].append(embeddings_array[batch_element_idx])
     os.makedirs(output_directory, exist_ok=True)
     for video, data in embeddings_per_video.items():
+        model_path_arr = np.array([model_path])
         annotation_ids = np.array(data["annotation_ids"])
         embeddings = np.array(data["embeddings"])
         output_path = os.path.join(output_directory, f"{video}_embeddings.npz")
-        np.savez(output_path, annotation_ids=annotation_ids, embeddings=embeddings)
+        np.savez(output_path, model_path=model_path_arr, annotation_ids=annotation_ids, embeddings=embeddings)
 
 
 if __name__ == "__main__":
@@ -154,4 +155,4 @@ if __name__ == "__main__":
     sampler = SoccerNetGSBatchSampler(dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_video_batch)
     loader = DataLoader(dataset, batch_sampler=sampler, num_workers=num_workers)
 
-    model_run(loader, model, device, output_path)
+    model_run(loader, model, device, output_path, model_path)

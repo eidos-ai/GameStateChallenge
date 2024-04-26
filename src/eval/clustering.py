@@ -9,6 +9,10 @@ def load_embeddings(embeddings_directory: str, video_name: str) -> list[torch.Fl
         '''Load embeddings from a given video'''
         embeddings_file_path = os.path.join(embeddings_directory, f"{video_name}_embeddings.npz")
         with np.load(embeddings_file_path) as data:
+            try:
+                model_path = data['model_path'][0]
+            except:
+                pass
             annotation_ids = data['annotation_ids']
             embeddings = data['embeddings']
         return annotation_ids, embeddings
