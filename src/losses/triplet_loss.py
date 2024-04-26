@@ -60,8 +60,6 @@ class SoccerPersonTripletSelector(TripletSelector):
         
     
     def get_triplets(self, embeddings: torch.FloatTensor, labels: torch.LongTensor, videos: List[str]):
-        
-        print("inside", videos, type(videos))
         embeddings = embeddings.cpu()
         labels = labels.cpu().numpy()
         # Create matrix with squared euclidean distances of all embeddings with each other
@@ -98,7 +96,6 @@ class SoccerPersonTripletSelector(TripletSelector):
             
             logger.debug(f"/////////////// anchor-positive pairs for {label}: {len(anchor_positives)}///////////////")
             anchor_positives = np.array(anchor_positives)
-            print("ap shape", anchor_positives.shape)
 
             ap_distances = distance_matrix[anchor_positives[:, 0], anchor_positives[:, 1]]
             for anchor_positive, ap_distance in zip(anchor_positives, ap_distances):
