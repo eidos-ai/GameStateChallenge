@@ -10,7 +10,7 @@ class SoccerNetGSDataset(Dataset):
     def __init__(
         self,
         dataset_path: str,
-        games_list: Optional[list] = None,
+        videos_list: Optional[list] = None,
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,
     ) -> None:
@@ -18,8 +18,9 @@ class SoccerNetGSDataset(Dataset):
         self.transform = transform
         self.target_transform = target_transform
         self.labels = []
+        self.videos_list = videos_list
 
-        gt_reader = GroundTruthReader(dataset_path, games_list)
+        gt_reader = GroundTruthReader(dataset_path, videos_list)
         for annotation in gt_reader.annotations: # returns list of Annotation objects
             annotation_dict = asdict(annotation)
             self.labels.append(annotation_dict)
@@ -53,11 +54,11 @@ if __name__ == "__main__":
     sys.path.append("../models")
     from models.resnet import TRANSFORM
 
-    games = ["SNGS-116", "SNGS-132", "SNGS-187"]
+    videos = ["SNGS-116", "SNGS-132", "SNGS-187"]
 
     dataset = SoccerNetGSDataset(
         "../../data/SoccerNetGS/test",
-        games_list=games,
+        videos_list=videos,
         transform=TRANSFORM,
     )
 
@@ -65,7 +66,7 @@ if __name__ == "__main__":
     idx_th = 10000
     for idx, dataset_item in tqdm(enumerate(dataset), total=len(dataset)):
         crop, label = dataset_item
-        if label["video"] not in games:
+        if label["video"] not in videos:
             print("error in video name", label["video"])
 
         if idx == idx_th:
