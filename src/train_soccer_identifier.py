@@ -23,8 +23,8 @@ from losses.triplet_loss import distance as triplet_loss_distance
 from models.resnet import ResnetMLP
 from models.resnet import TRANSFORM as RESNET_TRANSFORM
 
-from eval.clustering import MagicKmeansClustering
-from eval.clustering_evaluation import ClusteringAccuracyEvaluation, get_accuracy_average
+from eval.magic_kmeans_clustering import MagicKmeansClustering
+from eval.clustering_accuracy_evaluation import ClusteringAccuracyEvaluation, get_accuracy_average
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ def fit(train_loader, val_loader, model, loss_fn, optimizer, scheduler, n_epochs
             torch.save(model.state_dict(), model_output_path)
 
         print(message)
-    return best_model
+    return trained_model
 
 
 def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, metrics, neptune_logger):

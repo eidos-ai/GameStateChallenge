@@ -39,7 +39,7 @@ class SoccerNetGSBatchSampler(BatchSampler):
         self.used_label_indices_count = {video: 0 for video in self.videos}
         self.count = 0
 
-    def __iter__(self) -> List[int]:
+    def __iter__(self) -> Any:
         self.count = 0
         while self.count < self.n_dataset:
             # Calculate the remaining samples and decide the size of the next batch
