@@ -142,7 +142,7 @@ if __name__ == "__main__":
     from dataset import SoccerNetGSDataset
     from models.resnet import TRANSFORM
 
-    dataset = SoccerNetGSDataset("../../data/SoccerNetGS/train", transform=TRANSFORM, games_list=["SNGS-060", "SNGS-097", "SNGS-103"])
+    dataset = SoccerNetGSDataset("../../data/SoccerNetGS/train", transform=TRANSFORM, videos_list=["SNGS-060", "SNGS-097", "SNGS-103"])
     sampler = SoccerNetGSBatchSampler(dataset.labels, 3, 66)
     loader = DataLoader(dataset=dataset, batch_sampler=sampler, num_workers=0)
 
