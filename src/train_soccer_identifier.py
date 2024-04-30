@@ -132,13 +132,13 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
             triplet_batches = []
             ap_distances = []
             an_distances = []
-        if batch_idx > 10:
-            break
+        # if batch_idx > 10:
+        #     break
 
     total_loss /= (batch_idx + 1)
     return total_loss, metrics
 
-def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger, clustering_method):
+def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger):
     with torch.no_grad():
         model.eval()
         val_loss = 0
@@ -187,14 +187,19 @@ def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger, clu
                 ap_distances = []
                 an_distances = []
                 triplet_batches = []
-            if batch_idx > 10:
-                break
+            # if batch_idx > 10:
+            #     break
         val_loss /= (batch_idx + 1)
         
         # perform clustering evaluation
         logger.info(f"running evaluation on {val_loader.dataset.videos_list}")
         clustering_eval = ClusteringAccuracyEvaluation()
-        dbscan_cluster = DBScanClustering()
+        # DBScan params.
+        eps = 1
+        min_samples = 50
+        neptune_logger.param("DBScan/eps", eps)
+        neptune_logger.param("DBScan/min_samples", min_samples)
+        dbscan_cluster = DBScanClustering(eps, min_samples)
         dbscan_eval = DBScanEvaluation()
         accuracy_dict = defaultdict(lambda: defaultdict(list))
         dbscan_metrics_dict = defaultdict(lambda: defaultdict(list))
@@ -207,6 +212,7 @@ def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger, clu
                     video_labels.append(ann["role_id"])
             
             # Run MagicKMeans & log Metrics
+            clustering_method = MagicKmeansClustering()
             video_accuracy, video_clusters_accuracy_dict = clustering_eval.video_clustering_accuracy(video_labels, 
                                                                                                     video_embeddings,
                                                                                                     clustering_method,
@@ -342,7 +348,8 @@ if __name__ == "__main__":
     
     logger.info("Creating validation dataset and dataloader")
     valid_dataset = SoccerNetGSDataset(valid_dataset_path, transform=transform, videos_list=valid_videos)
-    valid_batch_sampler = SoccerNetGSBatchSampler(valid_dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_per_video_batch)
+    # Use only one video on valid dataloader, to avoid having more n_videos than videos on valid set
+    valid_batch_sampler = SoccerNetGSBatchSampler(valid_dataset.labels, n_videos=1, n_samples=n_samples_per_video_batch)
     online_valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_sampler=valid_batch_sampler, **kwargs)
     neptune_logger.param("valid_path", valid_dataset_path)
     logger.info(f"Valid dataset created with {str(valid_videos)}")
@@ -366,13 +373,11 @@ if __name__ == "__main__":
     n_epochs = epochs
     log_interval = 30
     
-    clustering_method = MagicKmeansClustering()
     
     trained_model = fit(online_train_loader, online_valid_loader, model, 
                         loss_fn, optimizer, scheduler, n_epochs, device, 
                         log_interval, experiment_output_dir, neptune_logger=neptune_logger, 
-                        model_output_path=model_output_path,
-                        clustering_method=clustering_method)
+                        model_output_path=model_output_path)
     
     # Upload model, disabled to save space
     # neptune_logger.upload_file(Path(output_model_path).name, output_model_path)    
