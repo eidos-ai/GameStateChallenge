@@ -25,13 +25,15 @@ from models.resnet import TRANSFORM as RESNET_TRANSFORM
 
 from eval.magic_kmeans_clustering import MagicKmeansClustering
 from eval.clustering_accuracy_evaluation import ClusteringAccuracyEvaluation, get_accuracy_average
+from eval.dbscan_clustering import DBScanClustering
+from eval.dbscan_evaluation import DBScanEvaluation
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
     
 
-def fit(train_loader, val_loader, model, loss_fn, optimizer, scheduler, n_epochs, device, log_interval, metrics=[],
+def fit(train_loader, val_loader, model, loss_fn, optimizer, scheduler, n_epochs, device, log_interval, experiment_folder, metrics=[],
         start_epoch=0, neptune_logger: NeptuneLogger=None, inference_transform=None, model_output_path=None,
         clustering_method=None):
     """
@@ -64,7 +66,13 @@ def fit(train_loader, val_loader, model, loss_fn, optimizer, scheduler, n_epochs
         if clustering_acc > best_clustering_acc:
             best_clustering_acc = clustering_acc
             torch.save(model.state_dict(), model_output_path)
-
+            
+        # Save model every epoch
+        folder_save_model_path = Path(experiment_folder, "models")
+        folder_save_model_path.mkdir(parents=True, exist_ok=True)
+        save_model_path = Path(folder_save_model_path, f"epoch_{epoch}.pt")
+        torch.save(model.state_dict(), save_model_path)
+        
         print(message)
     return model
 
@@ -124,6 +132,8 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
             triplet_batches = []
             ap_distances = []
             an_distances = []
+        if batch_idx > 10:
+            break
 
     total_loss /= (batch_idx + 1)
     return total_loss, metrics
@@ -177,12 +187,17 @@ def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger, clu
                 ap_distances = []
                 an_distances = []
                 triplet_batches = []
+            if batch_idx > 10:
+                break
         val_loss /= (batch_idx + 1)
         
         # perform clustering evaluation
         logger.info(f"running evaluation on {val_loader.dataset.videos_list}")
         clustering_eval = ClusteringAccuracyEvaluation()
+        dbscan_cluster = DBScanClustering()
+        dbscan_eval = DBScanEvaluation()
         accuracy_dict = defaultdict(lambda: defaultdict(list))
+        dbscan_metrics_dict = defaultdict(lambda: defaultdict(list))
         for video in val_loader.dataset.videos_list:
             video_embeddings = []
             video_labels = []
@@ -191,21 +206,31 @@ def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger, clu
                     video_embeddings.append(e)
                     video_labels.append(ann["role_id"])
             
+            # Run MagicKMeans & log Metrics
             video_accuracy, video_clusters_accuracy_dict = clustering_eval.video_clustering_accuracy(video_labels, 
                                                                                                     video_embeddings,
                                                                                                     clustering_method,
                                                                                                     video)
-            
             accuracy_dict[video]["overall"] = video_accuracy
             accuracy_dict[video]["per_class"] = video_clusters_accuracy_dict
-            # Log metrics of this video
             neptune_logger.log(f"MagicKMeans/pergame/{video}", video_accuracy)
+            
+            # Run DbScan & log Metrics
+            # dbscan_labels = dbscan_cluster.fit(video_embeddings)
+            dbscan_metrics = dbscan_eval.video_dbscan_evaluation(video_labels, video_embeddings, dbscan_cluster, video)
+            print(dbscan_metrics)            
+            for metric_name, metric_value in dbscan_metrics.__dict__.items():
+                neptune_logger.log(f"DBScan/pergame/{video}/{metric_name}", metric_value)
+                dbscan_metrics_dict[metric_name] = metric_value
             
         average_acc_dict = get_accuracy_average(accuracy_dict)
         # Log averaged metrics from all videos
         neptune_logger.log("MagicKMeans/Clustering accuracy", average_acc_dict["overall"])
         for cluster_id, cluster_acc in average_acc_dict["per_class"].items():
             neptune_logger.log(f"MagicKMeans/{cluster_id} accuracy", cluster_acc)
+            
+        for metric_name, metric_values in dbscan_metrics_dict.items():
+            neptune_logger.log(f"DBScan/{metric_name}", np.mean(metric_values))
     return val_loss, average_acc_dict, accuracy_dict
 
 # Custom function to parse a comma-separated list of integers
@@ -345,7 +370,7 @@ if __name__ == "__main__":
     
     trained_model = fit(online_train_loader, online_valid_loader, model, 
                         loss_fn, optimizer, scheduler, n_epochs, device, 
-                        log_interval, neptune_logger=neptune_logger, 
+                        log_interval, experiment_output_dir, neptune_logger=neptune_logger, 
                         model_output_path=model_output_path,
                         clustering_method=clustering_method)
     
