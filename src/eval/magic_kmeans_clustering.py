@@ -41,11 +41,8 @@ def calculate_n_clusters(video):
     return role_id_per_video[video]
 
 class MagicKmeansClustering():
-    def __init__(self, clustering_method: str="kmeans", n_clusters: int=5):
-        self.clustering_method = clustering_method
-        self.n_clusters = n_clusters
-        if clustering_method == "kmeans":
-            self.clustering = KMeans(n_clusters=self.n_clusters, random_state=0)
+    def __init__(self):
+        self.clustering = KMeans(n_clusters=5, random_state=0)
 
     def fit(self, embeddings: dict[str, int | torch.FloatTensor], video: str) -> list[int]:
         '''Clusters from given embeddings'''
@@ -69,11 +66,11 @@ class MagicKmeansClustering():
         with open(output_path, "w") as f:
             json.dump(output, f)
 
-    def cluster_and_export_games_list(self, games_list: list[str], embeddings_directory: str, output_directory: str, dataset_path: str) -> None:
+    def cluster_and_export_games_list(self, videos_list: list[str], embeddings_directory: str, output_directory: str, dataset_path: str) -> None:
         '''Load embeddings from a given directory and games_list, and export the predictions (clusters indices) 
             as a json file in a given directory'''
         for video in os.listdir(dataset_path):
-            if games_list and video not in games_list:
+            if videos_list and video not in videos_list:
                 continue
             if video == ".ipynb_checkpoints":
                 continue
@@ -81,7 +78,7 @@ class MagicKmeansClustering():
             if not os.path.isdir(video_path):
                 continue
             annotation_ids, embeddings = load_embeddings(embeddings_directory, video)
-            predictions = self.fit(embeddings)
+            predictions = self.fit(embeddings, video)
             self.export_predictions(video, annotation_ids, predictions, output_directory)
 
 
@@ -90,26 +87,12 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Clustering script.")
     parser.add_argument(
-        "--clustering_method",
-        type=str,
-        required=False,
-        default="kmeans",
-        help="Clustering method. e.g. kmeans, dbscan, etc.",
-    )
-    parser.add_argument(
-        "--n_clusters",
-        type=int,
-        required=False,
-        default=5,
-        help="Number of clusters.",
-    )
-    parser.add_argument(
-        "--games_list",
+        "--videos_list",
         type=str,
         required=False,
         nargs="+",
         default=None,  # example from train: SNGS-060 SNGS-097 SNGS-103
-        help="List of games to use for clustering.",
+        help="List of videos to use for clustering.",
     )
     parser.add_argument(
         "--embeddings_directory",
@@ -133,12 +116,10 @@ if __name__ == "__main__":
     )
 
     args = vars(parser.parse_args())
-    clustering_method = args["clustering_method"]
-    n_clusters = args["n_clusters"]
-    games_list = args["games_list"]
+    videos_list = args["videos_list"]
     embeddings_directory = args["embeddings_directory"]
     output_directory = args["output_directory"]
     dataset_path = args["dataset_path"]
 
-    magic_kmeans = MagicKmeansClustering(clustering_method, n_clusters)
-    magic_kmeans.cluster_and_export_games_list(games_list, embeddings_directory, output_directory, dataset_path)
+    magic_kmeans = MagicKmeansClustering()
+    magic_kmeans.cluster_and_export_games_list(videos_list, embeddings_directory, output_directory, dataset_path)
