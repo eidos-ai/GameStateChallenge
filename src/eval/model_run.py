@@ -2,9 +2,11 @@ import torch
 import sys
 import os
 import numpy as np
-sys.path.append("..")
-sys.path.append("../models")
-sys.path.append("../SNGS_dataset")
+
+
+parent_dir = os.path.dirname(os.path.dirname(__file__))
+sys.path.append(parent_dir)
+
 from tqdm import tqdm
 from typing import Any
 from models.resnet import ResnetMLP
@@ -72,22 +74,22 @@ if __name__ == "__main__":
         "--mlp_output_size",
         type=int,
         required=False,
-        default=64,
+        default=512,
         help="Output features size for the MLP",
     )
     parser.add_argument(
-        "--games_list",
+        "--videos_list",
         type=str,
         required=False,
         nargs="+",
         default=None,
-        help="List of games to use for inference",
+        help="List of videos to use for inference",
     )
     parser.add_argument(
         "--data_path",
         type=str,
         required=False,
-        default="../../data/SoccerNetGS/train",
+        default="../data/SoccerNetGS/train",
         help="Path to the data",
     )
     parser.add_argument(
@@ -133,7 +135,7 @@ if __name__ == "__main__":
     backbone = args["backbone"]
     hidden_layers = args["hidden_layers"]
     mlp_output_size = args["mlp_output_size"]
-    games_list = args["games_list"]
+    videos_list = args["videos_list"]
     data_path = args["data_path"]
     n_videos_batch = args["n_videos"]
     n_samples_video_batch = args["n_samples"]
@@ -151,7 +153,7 @@ if __name__ == "__main__":
     model.eval()
 
     # Load data
-    dataset = SoccerNetGSDataset(dataset_path=data_path, games_list=games_list, transform=TRANSFORM)
+    dataset = SoccerNetGSDataset(dataset_path=data_path, videos_list=videos_list, transform=TRANSFORM)
     sampler = SoccerNetGSBatchSampler(dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_video_batch)
     loader = DataLoader(dataset, batch_sampler=sampler, num_workers=num_workers)
 
