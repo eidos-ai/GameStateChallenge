@@ -40,7 +40,7 @@ def calculate_n_clusters(video):
                          'SNGS-021': 4, 'SNGS-024': 4 }
     return role_id_per_video[video]
 
-class TeamClustering():
+class MagicKmeansClustering():
     def __init__(self, clustering_method: str="kmeans", n_clusters: int=5):
         self.clustering_method = clustering_method
         self.n_clusters = n_clusters
@@ -140,5 +140,5 @@ if __name__ == "__main__":
     output_directory = args["output_directory"]
     dataset_path = args["dataset_path"]
 
-    team_clustering = TeamClustering(clustering_method, n_clusters)
-    team_clustering.cluster_and_export_games_list(games_list, embeddings_directory, output_directory, dataset_path)
+    magic_kmeans = MagicKmeansClustering(clustering_method, n_clusters)
+    magic_kmeans.cluster_and_export_games_list(games_list, embeddings_directory, output_directory, dataset_path)

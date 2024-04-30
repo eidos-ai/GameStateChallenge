@@ -2,6 +2,8 @@
 This repository was created to solve the challenge proposed by SoccerNet. The challenge itself requirest to create a game state from a set of labels (json files) generated using computer vision.
 The eidos template was used to create this repository, so Black (code linting) and MyPy (static code typing) are used and checked through Github actions.
 
+> Important: the following instructions were tested on Mars (NVIDIA GPU). If you are using a different environment, you may need to change the installation commands.
+
 ## Installation
 In order to run the code, you first need to clone the repository and its submodules. To do so, run the following command:
 
