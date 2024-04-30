@@ -9,7 +9,7 @@ from SNGS_dataset.groundtruth_reader import GroundTruthReader
 from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import confusion_matrix
 from collections import defaultdict
-from typing import Any
+from typing import Any, List
 from magic_kmeans_clustering import MagicKmeansClustering
 from dbscan_clustering import DBScanClustering
 from tqdm import tqdm
@@ -26,7 +26,7 @@ def load_embeddings(embeddings_directory: str, video_name: str) -> Any:
             embeddings = data['embeddings']
         return annotation_ids, embeddings
 
-def clustering_accuracy(labels_true: list[int], labels_pred: list[int]):
+def clustering_accuracy(labels_true: List[int], labels_pred: List[int]):
     # Create the confusion matrix
     cm = confusion_matrix(labels_true, labels_pred, labels=[0, 1, 2, 3, 4])
 
@@ -138,7 +138,7 @@ if __name__ == "__main__":
     dataset_path = args["dataset_path"]
     videos_list = args["videos_list"]
     embeddings_directory = args["embeddings_directory"]
-    
+
     clustering_evaluation = ClusteringAccuracyEvaluation(videos_list)
     clustering_method = MagicKmeansClustering()
     average_acc_dict, accuracy_dict = clustering_evaluation.stored_videos_clustering_accuracy(dataset_path,

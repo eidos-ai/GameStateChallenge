@@ -2,20 +2,25 @@ import os
 import json
 import numpy as np
 import torch
+import logging
 from collections import defaultdict
 from sklearn.cluster import KMeans
 
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 def load_embeddings(embeddings_directory: str, video_name: str) -> list[torch.FloatTensor]:
-        '''Load embeddings from a given video'''
-        embeddings_file_path = os.path.join(embeddings_directory, f"{video_name}_embeddings.npz")
-        with np.load(embeddings_file_path) as data:
-            try:
-                model_path = data['model_path'][0]
-            except:
-                pass
-            annotation_ids = data['annotation_ids']
-            embeddings = data['embeddings']
-        return annotation_ids, embeddings
+    '''Load embeddings from a given video'''
+    embeddings_file_path = os.path.join(embeddings_directory, f"{video_name}_embeddings.npz")
+    with np.load(embeddings_file_path) as data:
+        try:
+            model_path = data['model_path'][0]
+        except Exception as e:
+            logger.debug(f"{str(e)} on {embeddings_file_path}")
+        annotation_ids = data['annotation_ids']
+        embeddings = data['embeddings']
+    return annotation_ids, embeddings
     
 def calculate_n_clusters(video):
     role_id_per_video = {# train videos
@@ -47,11 +52,8 @@ class MagicKmeansClustering():
     def fit(self, embeddings: dict[str, int | torch.FloatTensor], video: str) -> list[int]:
         '''Clusters from given embeddings'''
         number_of_clusters = calculate_n_clusters(video)
-        if number_of_clusters != 5:
-            kmeans = KMeans(n_clusters=number_of_clusters, random_state=0)
-            clusters = kmeans.fit(embeddings)
-            return clusters.labels_
-        clusters = self.clustering.fit(embeddings)
+        kmeans = KMeans(n_clusters=number_of_clusters, random_state=0)
+        clusters = kmeans.fit(embeddings)
         return clusters.labels_
     
     def export_predictions(self, video, annotations: list[int], predictions: list[int], output_directory: str) -> None:
