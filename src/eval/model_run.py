@@ -9,6 +9,7 @@ from tqdm import tqdm
 from typing import Any
 from models.resnet import ResnetMLP
 from models.resnet import TRANSFORM
+from models.prtreid_wrapper import PRTReId
 from collections import defaultdict
 from torch.utils.data import DataLoader
 from SNGS_dataset.dataset import SoccerNetGSDataset
@@ -50,8 +51,26 @@ if __name__ == "__main__":
         "-m",
         "--model_path",
         type=str,
-        required=True,
+        required=False,
+        default=None,
         help="Path to the model used for inference",
+    )
+    parser.add_argument(
+        "-p",
+        "--prtreid_path",
+        type=str,
+        required=False,
+        default=None,
+        help="Path to the saved pickle of PRTReid model",
+    )
+    parser.add_argument(
+        "-pe",
+        "--prtreid_embeddings",
+        type=str,
+        choices=['globl', 'foreg', 'conct', 'parts'],
+        required=False,
+        default='globl',
+        help="Type of embeddings output from PRTReid model",
     )
     parser.add_argument(
         "--backbone",
@@ -76,7 +95,7 @@ if __name__ == "__main__":
         help="Output features size for the MLP",
     )
     parser.add_argument(
-        "--games_list",
+        "--videos_list",
         type=str,
         required=False,
         nargs="+",
@@ -130,10 +149,12 @@ if __name__ == "__main__":
     print(f"Using {device} device")
 
     model_path = args["model_path"]
+    prtreid_path = args["prtreid_path"]
+    prtreid_embeddings = args["prtreid_embeddings"]
     backbone = args["backbone"]
     hidden_layers = args["hidden_layers"]
     mlp_output_size = args["mlp_output_size"]
-    games_list = args["games_list"]
+    videos_list = args["videos_list"]
     data_path = args["data_path"]
     n_videos_batch = args["n_videos"]
     n_samples_video_batch = args["n_samples"]
@@ -141,17 +162,25 @@ if __name__ == "__main__":
     output_path = args["output_path"]
     
     # Load model
-    model = ResnetMLP(
-        resnet_model=backbone,
-        mlp_hidden_layers=hidden_layers,
-        mlp_output_size=mlp_output_size,
-    )
-    model.load_state_dict(torch.load(model_path))
-    model.to(device)
-    model.eval()
+    if model_path:
+        model = ResnetMLP(
+            resnet_model=backbone,
+            mlp_hidden_layers=hidden_layers,
+            mlp_output_size=mlp_output_size,
+        )
+        model.load_state_dict(torch.load(model_path))
+        model.to(device)
+        model.eval()
+    elif prtreid_path:
+        model = torch.load(prtreid_path)
+        model.target_embeddings = prtreid_embeddings
+        model.eval()
+        model_path = prtreid_path
+    else:
+        raise Exception("No path to trained model was provided")
 
     # Load data
-    dataset = SoccerNetGSDataset(dataset_path=data_path, games_list=games_list, transform=TRANSFORM)
+    dataset = SoccerNetGSDataset(dataset_path=data_path, videos_list=videos_list, transform=TRANSFORM)
     sampler = SoccerNetGSBatchSampler(dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_video_batch)
     loader = DataLoader(dataset, batch_sampler=sampler, num_workers=num_workers)
 
