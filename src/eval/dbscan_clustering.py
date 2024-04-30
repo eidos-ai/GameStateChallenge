@@ -36,7 +36,7 @@ class DBScanClustering():
     def export_predictions(self, video, annotations: list[int], predictions: list[int], output_directory: str) -> None:
         '''Given a video and its list of predictions (cluster indices), export them as a json file in a given directory.
             Each json file corresponds to a single video and its keys are annotation_ids while its values are the
-            corresponding predicted role_id'''        
+            corresponding predicted cluster id'''        
         output_path = os.path.join(output_directory, f"{video}_dbscan_predictions.json")
         output = defaultdict(list)
         for i in range(len(predictions)):
@@ -45,11 +45,11 @@ class DBScanClustering():
         with open(output_path, "w") as f:
             json.dump(output, f)
 
-    def cluster_and_export_games_list(self, games_list: list[str], embeddings_directory: str, output_directory: str, dataset_path: str) -> None:
-        '''Load embeddings from a given directory and games_list, and export the predictions (clusters indices) 
+    def cluster_and_export_games_list(self, videos_list: list[str], embeddings_directory: str, output_directory: str, dataset_path: str) -> None:
+        '''Load embeddings from a given directory and videos_list, and export the predictions (clusters indices) 
             as a json file in a given directory'''
         for video in os.listdir(dataset_path):
-            if games_list and video not in games_list:
+            if videos_list and video not in videos_list:
                 continue
             if video == ".ipynb_checkpoints":
                 continue
@@ -66,12 +66,12 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Clustering script.")
     parser.add_argument(
-        "--games_list",
+        "--videos_list",
         type=str,
         required=False,
         nargs="+",
         default=None,  # example from train: SNGS-060 SNGS-097 SNGS-103
-        help="List of games to use for clustering.",
+        help="List of videos to use for clustering.",
     )
     parser.add_argument(
         "--embeddings_directory",
@@ -109,7 +109,7 @@ if __name__ == "__main__":
     )
 
     args = vars(parser.parse_args())
-    games_list = args["games_list"]
+    videos_list = args["videos_list"]
     embeddings_directory = args["embeddings_directory"]
     output_directory = args["output_directory"]
     dataset_path = args["dataset_path"]
@@ -117,4 +117,4 @@ if __name__ == "__main__":
     min_samples = args["min_samples"]
 
     dbscan_clustering = DBScanClustering(eps=eps, min_samples=min_samples)
-    dbscan_clustering.cluster_and_export_games_list(games_list, embeddings_directory, output_directory, dataset_path)
+    dbscan_clustering.cluster_and_export_games_list(videos_list, embeddings_directory, output_directory, dataset_path)

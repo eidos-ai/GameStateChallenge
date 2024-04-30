@@ -125,14 +125,30 @@ if __name__ == "__main__":
         default="./video_files",
         help="Directory where the embeddings (npz files) are.",
     )
+    parser.add_argument(
+        "--eps",
+        type=float,
+        required=False,
+        default=0.5,
+        help="The maximum distance between two samples for one to be considered as in the neighborhood of the other.",
+    )
+    parser.add_argument(
+        "--min_samples",
+        type=int,
+        required=False,
+        default=5,
+        help="The number of samples (or total weight) in a neighborhood for a point to be considered as a core point.",
+    )
 
     args = vars(parser.parse_args())
     dataset_path = args["dataset_path"]
     videos_list = args["videos_list"]
     embeddings_directory = args["embeddings_directory"]
+    eps = args["eps"]
+    min_samples = args["min_samples"]
 
     clustering_evaluation = DBScanEvaluation(videos_list)
-    clustering_method = DBScanClustering()
+    clustering_method = DBScanClustering(eps=eps, min_samples=min_samples)
     average_dict, metrics_dict = clustering_evaluation.stored_videos_dbscan_evaluation(dataset_path, embeddings_directory, clustering_method)
 
     print(json.dumps(metrics_dict, indent=4, cls=MyEncoder))
