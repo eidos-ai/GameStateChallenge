@@ -1,4 +1,3 @@
-from dataclasses import asdict
 import os
 import sys
 import torch
@@ -8,6 +7,7 @@ sys.path.append("../SNGS_dataset")
 from SNGS_dataset.groundtruth_reader import GroundTruthReader
 from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import confusion_matrix
+from dataclasses import asdict, dataclass, fields
 from collections import defaultdict
 from typing import Any
 from dbscan_clustering import DBScanClustering
@@ -32,10 +32,18 @@ def get_average_dict(metrics_dict):
     avg_dict = defaultdict(float)
     for video in metrics_dict.keys():
         for metric in metrics_dict[video].keys():
-            avg_dict[metric] += metrics_dict[video][metric]
+            if metric != "predicted_clusters":
+                avg_dict[f"{metric}_average"] += metrics_dict[video][metric]
     for metric in avg_dict.keys():
         avg_dict[metric] /= len(metrics_dict)
+        avg_dict[metric] = round(avg_dict[metric], 3)
     return avg_dict
+
+@dataclass(frozen=True)
+class Metrics:
+    predicted_clusters: int
+    homogeneity: float
+    completeness: float
 
 
 class DBScanEvaluation():
@@ -47,12 +55,19 @@ class DBScanEvaluation():
         '''Evaluates clustering from on-memory data'''
         assert len(gt_cluster_ids) == len(embeddings), "The annotations and embeddings lists have different lengths"
         predictions = clustering_method.fit(embeddings)
-        metrics_dict = defaultdict(float)
-        metrics_dict["homogeneity"] = round(metrics.homogeneity_score(gt_cluster_ids, predictions), 3)
-        metrics_dict["completeness"] = round(metrics.completeness_score(gt_cluster_ids, predictions), 3)
-        metrics_dict["adjusted_rand_index"] = round(metrics.adjusted_rand_score(gt_cluster_ids, predictions), 3)
+        clusters_count = len(set(predictions))
+        video_metrics = Metrics(predicted_clusters=clusters_count - 1 if -1 in predictions else clusters_count,
+                                homogeneity=round(metrics.homogeneity_score(gt_cluster_ids, predictions), 3),
+                                completeness=round(metrics.completeness_score(gt_cluster_ids, predictions), 3)
+                                )
+        # metrics_dict = defaultdict(float)
+        # metrics_dict["clusters_count"] = clusters_count - 1 if -1 in clusters_count else clusters_count
+        # metrics_dict["homogeneity"] = round(metrics.homogeneity_score(gt_cluster_ids, predictions), 3)
+        # metrics_dict["completeness"] = round(metrics.completeness_score(gt_cluster_ids, predictions), 3)
+        # metrics_dict["adjusted_rand_index"] = round(metrics.adjusted_rand_score(gt_cluster_ids, predictions), 3)
         # metrics_dict["silhouette_coefficient"] = round(metrics.silhouette_score(embeddings, predictions), 3)
-        return metrics_dict
+        # return metrics_dict
+        return video_metrics
 
     def stored_videos_dbscan_evaluation(self, dataset_path: str, embeddings_directory: str, 
                                           clustering_method: DBScanClustering) -> dict[str: Any]:
@@ -72,8 +87,8 @@ class DBScanEvaluation():
                         groundtruth.append(annotation.role_id)
                         break
             # Perform clustering fit and eval with video embeddings and annotations
-            metrics = self.video_dbscan_evaluation(groundtruth, video_embeddings, clustering_method, video)
-            metrics_dict[video] = metrics
+            video_metrics = self.video_dbscan_evaluation(groundtruth, video_embeddings, clustering_method, video)
+            metrics_dict[video] = asdict(video_metrics)
         average_dict = get_average_dict(metrics_dict)
         return average_dict, metrics_dict
 
