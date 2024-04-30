@@ -66,7 +66,7 @@ def fit(train_loader, val_loader, model, loss_fn, optimizer, scheduler, n_epochs
             torch.save(model.state_dict(), model_output_path)
 
         print(message)
-    return best_model
+    return trained_model
 
 
 def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, metrics, neptune_logger):
