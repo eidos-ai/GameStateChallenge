@@ -61,7 +61,6 @@ class DBScanEvaluation:
         gt_cluster_ids: list[int],
         embeddings: list[Any],
         clustering_method: DBScanClustering,
-        video: str,
     ) -> dict[str:Any]:
         """Evaluates clustering from on-memory data"""
         assert len(gt_cluster_ids) == len(
