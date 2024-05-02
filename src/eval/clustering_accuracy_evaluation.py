@@ -16,17 +16,21 @@ from magic_kmeans_clustering import MagicKmeansClustering
 from dbscan_clustering import DBScanClustering
 from tqdm import tqdm
 
+
 def load_embeddings(embeddings_directory: str, video_name: str) -> Any:
-        '''Load embeddings from a given video'''
-        embeddings_file_path = os.path.join(embeddings_directory, f"{video_name}_embeddings.npz")
-        with np.load(embeddings_file_path) as data:
-            try:
-                model_path = data['model_path'][0]
-            except:
-                pass
-            annotation_ids = data['annotation_ids']
-            embeddings = data['embeddings']
-        return annotation_ids, embeddings
+    """Load embeddings from a given video"""
+    embeddings_file_path = os.path.join(
+        embeddings_directory, f"{video_name}_embeddings.npz"
+    )
+    with np.load(embeddings_file_path) as data:
+        try:
+            model_path = data["model_path"][0]
+        except:
+            pass
+        annotation_ids = data["annotation_ids"]
+        embeddings = data["embeddings"]
+    return annotation_ids, embeddings
+
 
 def clustering_accuracy(labels_true: List[int], labels_pred: List[int]):
     # Create the confusion matrix
@@ -50,8 +54,9 @@ def clustering_accuracy(labels_true: List[int], labels_pred: List[int]):
 
     return overall_accuracy, per_class_accuracy
 
+
 def get_accuracy_average(accuracy_dict):
-    '''Get the average accuracy of all videos.'''
+    """Get the average accuracy of all videos."""
     overall_acc = 0
     per_class_nones = defaultdict(int)
     per_class_acc = defaultdict(float)
@@ -61,49 +66,66 @@ def get_accuracy_average(accuracy_dict):
             if accuracy_dict[video]["per_class"][class_idx] is None:
                 per_class_nones[class_idx] += 1
                 continue
-            per_class_acc[int(class_idx)] += accuracy_dict[video]["per_class"][class_idx]
+            per_class_acc[int(class_idx)] += accuracy_dict[video]["per_class"][
+                class_idx
+            ]
     overall_acc /= len(accuracy_dict)
     for class_idx in per_class_acc.keys():
-        per_class_acc[class_idx] /= (len(accuracy_dict) - per_class_nones[class_idx])
+        per_class_acc[class_idx] /= len(accuracy_dict) - per_class_nones[class_idx]
     avg_dict = defaultdict(lambda: defaultdict(list))
     avg_dict["overall"] = overall_acc
     avg_dict["per_class"] = per_class_acc
     return avg_dict
 
 
-class ClusteringAccuracyEvaluation():
-    def __init__(self, videos_list: list[str]=None):
+class ClusteringAccuracyEvaluation:
+    def __init__(self, videos_list: list[str] = None):
         self.videos_list = videos_list
 
-    def video_clustering_accuracy(self, gt_cluster_ids: list[int], embeddings: list[Any], 
-                                   clustering_method: MagicKmeansClustering, video: str) -> dict[str: Any]:
-        '''Evaluates clustering from on-memory data'''
-        assert len(gt_cluster_ids) == len(embeddings), "The annotations and embeddings lists have different lengths"
+    def video_clustering_accuracy(
+        self,
+        gt_cluster_ids: list[int],
+        embeddings: list[Any],
+        clustering_method: MagicKmeansClustering,
+        video: str,
+    ) -> dict[str:Any]:
+        """Evaluates clustering from on-memory data"""
+        assert len(gt_cluster_ids) == len(
+            embeddings
+        ), "The annotations and embeddings lists have different lengths"
         predictions = clustering_method.fit(embeddings, video)
         overall_acc, per_class_acc = clustering_accuracy(gt_cluster_ids, predictions)
         return overall_acc, per_class_acc
 
-    def stored_videos_clustering_accuracy(self, dataset_path: str, embeddings_directory: str, 
-                                          clustering_method: MagicKmeansClustering) -> dict[str: Any]:
-        '''Loads data to evaluate clustering'''
+    def stored_videos_clustering_accuracy(
+        self,
+        dataset_path: str,
+        embeddings_directory: str,
+        clustering_method: MagicKmeansClustering,
+    ) -> dict[str:Any]:
+        """Loads data to evaluate clustering"""
         if self.videos_list is None:
-            self.videos_list = [video for video in os.listdir(dataset_path) if video[:5] != "SNGS-"]
+            self.videos_list = [
+                video for video in os.listdir(dataset_path) if video[:5] != "SNGS-"
+            ]
         gt_reader = GroundTruthReader(dataset_path, self.videos_list)
         accuracy_dict = defaultdict(lambda: defaultdict(list))
         for video in tqdm(self.videos_list, total=len(self.videos_list)):
             # Get embeddings and annotations for this video in correct order
             groundtruth = []
             video_gt = gt_reader.get_annotations_from_video(video)
-            video_embeddings_annotations_ids, video_embeddings = load_embeddings(embeddings_directory, video)
+            video_embeddings_annotations_ids, video_embeddings = load_embeddings(
+                embeddings_directory, video
+            )
             for ann_id in video_embeddings_annotations_ids:
                 for annotation in video_gt:
                     if annotation.annotation_id == ann_id:
                         groundtruth.append(annotation.role_id)
                         break
             # Perform clustering fit and eval with video embeddings and annotations
-            overall_accuracy, clusters_accuracy_dict = self.video_clustering_accuracy(groundtruth, video_embeddings, 
-                                                                                      clustering_method,
-                                                                                      video)
+            overall_accuracy, clusters_accuracy_dict = self.video_clustering_accuracy(
+                groundtruth, video_embeddings, clustering_method, video
+            )
             accuracy_dict[video]["overall"] = overall_accuracy
             accuracy_dict[video]["per_class"] = clusters_accuracy_dict
         average_acc_dict = get_accuracy_average(accuracy_dict)
@@ -116,10 +138,10 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Script for clustering evaluation.")
     parser.add_argument(
-        "--dataset_path",
+        "--data_path",
         type=str,
-        required=True, # example: ../../data/SoccerNetGS/train
-        help="Dataset path: train, valid or test folder path.",
+        required=True,  # example: ../../data/SoccerNetGS/train
+        help="Train, valid or test folder path.",
     )
     parser.add_argument(
         "--videos_list",
@@ -137,14 +159,16 @@ if __name__ == "__main__":
         help="Directory where the embeddings (npz files) are.",
     )
     args = vars(parser.parse_args())
-    dataset_path = args["dataset_path"]
+    data_path = args["data_path"]
     videos_list = args["videos_list"]
     embeddings_directory = args["embeddings_directory"]
 
     clustering_evaluation = ClusteringAccuracyEvaluation(videos_list)
     clustering_method = MagicKmeansClustering()
-    average_acc_dict, accuracy_dict = clustering_evaluation.stored_videos_clustering_accuracy(dataset_path,
-                                                                                              embeddings_directory,
-                                                                                              clustering_method)
+    average_acc_dict, accuracy_dict = (
+        clustering_evaluation.stored_videos_clustering_accuracy(
+            data_path, embeddings_directory, clustering_method
+        )
+    )
     print(json.dumps(accuracy_dict, indent=4))
     print(json.dumps(average_acc_dict, indent=4))

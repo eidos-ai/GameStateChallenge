@@ -6,37 +6,48 @@ import numpy as np
 from collections import defaultdict
 from sklearn.cluster import DBSCAN
 
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-def load_embeddings(embeddings_directory: str, video_name: str) -> list[torch.FloatTensor]:
-    '''Load embeddings from a given video'''
-    embeddings_file_path = os.path.join(embeddings_directory, f"{video_name}_embeddings.npz")
+
+def load_embeddings(
+    embeddings_directory: str, video_name: str
+) -> list[torch.FloatTensor]:
+    """Load embeddings from a given video"""
+    embeddings_file_path = os.path.join(
+        embeddings_directory, f"{video_name}_embeddings.npz"
+    )
     with np.load(embeddings_file_path) as data:
         model_path = None
-        annotation_ids = data['annotation_ids']
-        embeddings = data['embeddings']
+        annotation_ids = data["annotation_ids"]
+        embeddings = data["embeddings"]
         try:
-            model_path = data['model_path'][0]
+            model_path = data["model_path"][0]
         except Exception as e:
             logger.debug(f"{str(e)} on {embeddings_file_path}")
     return model_path, annotation_ids, embeddings
 
 
-class DBScanClustering():
-    def __init__(self, eps: float=0.5, min_samples: int=5):
+class DBScanClustering:
+    def __init__(self, eps: float = 0.5, min_samples: int = 5):
         self.db = DBSCAN(eps=eps, min_samples=min_samples)
 
     def fit(self, embeddings) -> list[int]:
-        '''Clusters from given embeddings'''
+        """Clusters from given embeddings"""
         db = self.db.fit(embeddings)
         return db.labels_
 
-    def export_predictions(self, video, annotations: list[int], predictions: list[int], output_directory: str) -> None:
-        '''Given a video and its list of predictions (cluster indices), export them as a json file in a given directory.
-            Each json file corresponds to a single video and its keys are annotation_ids while its values are the
-            corresponding predicted cluster id'''        
+    def export_predictions(
+        self,
+        video,
+        annotations: list[int],
+        predictions: list[int],
+        output_directory: str,
+    ) -> None:
+        """Given a video and its list of predictions (cluster indices), export them as a json file in a given directory.
+        Each json file corresponds to a single video and its keys are annotation_ids while its values are the
+        corresponding predicted cluster id"""
         output_path = os.path.join(output_directory, f"{video}_dbscan_predictions.json")
         output = defaultdict(list)
         for i in range(len(predictions)):
@@ -45,9 +56,15 @@ class DBScanClustering():
         with open(output_path, "w") as f:
             json.dump(output, f)
 
-    def cluster_and_export_games_list(self, videos_list: list[str], embeddings_directory: str, output_directory: str, dataset_path: str) -> None:
-        '''Load embeddings from a given directory and videos_list, and export the predictions (clusters indices) 
-            as a json file in a given directory'''
+    def cluster_and_export_games_list(
+        self,
+        videos_list: list[str],
+        embeddings_directory: str,
+        output_directory: str,
+        dataset_path: str,
+    ) -> None:
+        """Load embeddings from a given directory and videos_list, and export the predictions (clusters indices)
+        as a json file in a given directory"""
         for video in os.listdir(dataset_path):
             if videos_list and video not in videos_list:
                 continue
@@ -58,7 +75,9 @@ class DBScanClustering():
                 continue
             _, annotation_ids, embeddings = load_embeddings(embeddings_directory, video)
             predictions = self.fit(embeddings)
-            self.export_predictions(video, annotation_ids, predictions, output_directory)
+            self.export_predictions(
+                video, annotation_ids, predictions, output_directory
+            )
 
 
 if __name__ == "__main__":
@@ -88,10 +107,10 @@ if __name__ == "__main__":
         help="Directory to save the json output file.",
     )
     parser.add_argument(
-        "--dataset_path",
+        "--data_path",
         type=str,
         required=True,
-        help="Dataset path of train, valid or test.",
+        help="Path of train, valid or test.",
     )
     parser.add_argument(
         "--eps",
@@ -112,9 +131,11 @@ if __name__ == "__main__":
     videos_list = args["videos_list"]
     embeddings_directory = args["embeddings_directory"]
     output_directory = args["output_directory"]
-    dataset_path = args["dataset_path"]
+    data_path = args["data_path"]
     eps = args["eps"]
     min_samples = args["min_samples"]
 
     dbscan_clustering = DBScanClustering(eps=eps, min_samples=min_samples)
-    dbscan_clustering.cluster_and_export_games_list(videos_list, embeddings_directory, output_directory, dataset_path)
+    dbscan_clustering.cluster_and_export_games_list(
+        videos_list, embeddings_directory, output_directory, data_path
+    )
