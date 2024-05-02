@@ -25,7 +25,7 @@ class Metrics:
         return f"Metrics({', '.join(props)})"
 
 
-def load_embeddings(embeddings_directory: str, video_name: str) -> Any:
+def load_embeddings(embeddings_directory: str, video_name: str) -> Tuple[np.array, np.array]:
     """Load embeddings from a given video"""
     embeddings_file_path = os.path.join(
         embeddings_directory, f"{video_name}_embeddings.npz"
@@ -97,7 +97,7 @@ class DBScanEvaluation:
         self,
         predicctions_dict: Dict[str, Any],
         groundtruth_dict: Dict[str, Any],
-    ) -> Tuple[Dict[str, Any], List[Metrics]]:
+    ) -> Tuple[Metrics, List[Metrics]]:
         """Evaluates clustering for all videos"""
         assert len(predicctions_dict.keys()) == len(
             groundtruth_dict.keys()
