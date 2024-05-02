@@ -40,6 +40,7 @@ def load_data(
     dataset_path: str,
     embeddings_directory: str,
     videos_list: List[str],
+    clustering_method: DBScanClustering,
 ) -> Any:
     """Loads data for evaluation"""
     if videos_list is None:
@@ -47,7 +48,7 @@ def load_data(
             video for video in os.listdir(dataset_path) if video[:5] != "SNGS-"
         ]
     gt_reader = GroundTruthReader(dataset_path, videos_list)
-    embeddings_dict = defaultdict(lambda: defaultdict(list))
+    predictions_dict = defaultdict(lambda: defaultdict(list))
     groundtruth_dict = defaultdict(lambda: defaultdict(list))
 
     for video in tqdm(videos_list, total=len(videos_list)):
@@ -66,9 +67,10 @@ def load_data(
                     video_groundtruth.append(annotation.role_id)
                     break
         # At this point, I have video_groundtruth and video_embeddings
-        embeddings_dict[video] = video_embeddings
+        predictions = clustering_method.fit(video_embeddings)
+        predictions_dict[video] = predictions
         groundtruth_dict[video] = video_groundtruth
-    return embeddings_dict, groundtruth_dict
+    return predictions_dict, groundtruth_dict
 
 
 def get_average_metrics(metrics_list: List[Metrics]):
@@ -88,28 +90,35 @@ def get_average_metrics(metrics_list: List[Metrics]):
 class DBScanEvaluation:
     def videos_dbscan_evaluation(
         self,
-        annotations_dict: Dict[str, Any],
-        embeddings_dict: Dict[str, Any],
-        clustering_method: DBScanClustering,
+        predicctions_dict: Dict[str, Any],
+        groundtruth_dict: Dict[str, Any],
     ) -> Any:
         """Evaluates clustering for all videos"""
-        assert len(annotations_dict.keys()) == len(
-            embeddings_dict.keys()
-        ), "Different number of videos in annotations and embeddings"
+        assert len(predicctions_dict.keys()) == len(
+            groundtruth_dict.keys()
+        ), "Different number of videos in predictions and groundtruth"
         total_metrics = []
-        for video in annotations_dict.keys():
-            predictions = clustering_method.fit(embeddings_dict[video])
-            clusters_count = len(set(predictions))
+        for video in groundtruth_dict.keys():
+
+            clusters_count = len(set(predicctions_dict[video]))
             video_metrics = Metrics(
                 video=video,
                 predicted_clusters=(
-                    clusters_count - 1 if -1 in predictions else clusters_count
+                    clusters_count - 1
+                    if -1 in predicctions_dict[video]
+                    else clusters_count
                 ),
                 homogeneity=round(
-                    metrics.homogeneity_score(annotations_dict[video], predictions), 3
+                    metrics.homogeneity_score(
+                        groundtruth_dict[video], predicctions_dict[video]
+                    ),
+                    3,
                 ),
                 completeness=round(
-                    metrics.completeness_score(annotations_dict[video], predictions), 3
+                    metrics.completeness_score(
+                        groundtruth_dict[video], predicctions_dict[video]
+                    ),
+                    3,
                 ),
             )
             total_metrics.append(video_metrics)
@@ -172,13 +181,14 @@ if __name__ == "__main__":
     eps = args["eps"]
     min_samples = args["min_samples"]
 
-    clustering_evaluation = DBScanEvaluation()
     clustering_method = DBScanClustering(eps=eps, min_samples=min_samples)
-    embeddings_dict, annotations_dict = load_data(
-        data_path, embeddings_directory, videos_list
+    predictions_dict, groundtruth_dict = load_data(
+        data_path, embeddings_directory, videos_list, clustering_method
     )
+
+    clustering_evaluation = DBScanEvaluation()
     average_dict, metrics_list = clustering_evaluation.videos_dbscan_evaluation(
-        annotations_dict, embeddings_dict, clustering_method
+        predictions_dict, groundtruth_dict
     )
 
     for item in metrics_list:
