@@ -9,7 +9,7 @@ from torch import nn
 from torchvision import transforms
 from PIL import Image
 
-from mlp import MLP
+from models.mlp import MLP
 
 __all__ = [
     'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',

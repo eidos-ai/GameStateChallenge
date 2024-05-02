@@ -1,7 +1,7 @@
 import os
 from torch.utils.data import Dataset
 from typing import Optional, Callable
-from groundtruth_reader import GroundTruthReader
+from SNGS_dataset.groundtruth_reader import GroundTruthReader
 from PIL import Image
 from dataclasses import asdict
 
@@ -24,7 +24,7 @@ class SoccerNetGSDataset(Dataset):
         for annotation in gt_reader.annotations: # returns list of Annotation objects
             annotation_dict = asdict(annotation)
             self.labels.append(annotation_dict)
-
+            
     def __len__(self) -> int:
         return len(self.labels)
 
