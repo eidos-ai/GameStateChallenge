@@ -55,6 +55,7 @@ def load_data(
     predictions_dict = defaultdict(lambda: defaultdict(list))
     groundtruth_dict = defaultdict(lambda: defaultdict(list))
 
+    print("Evaluating videos' DBSCAN clustering:")
     for video in tqdm(videos_list, total=len(videos_list)):
         # Get embeddings and annotations for this video in correct order
         video_groundtruth = []
@@ -196,6 +197,9 @@ if __name__ == "__main__":
         predictions_dict, groundtruth_dict
     )
 
+    print("Metrics for each video using DBSCAN:")
     for item in metrics_list:
         print(item)
-    print(average_metrics)
+        
+    print("Average metrics using DBSCAN:")
+    print(average_metrics, "\n")

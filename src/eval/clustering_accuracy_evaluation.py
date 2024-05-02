@@ -110,6 +110,7 @@ class ClusteringAccuracyEvaluation:
             ]
         gt_reader = GroundTruthReader(dataset_path, self.videos_list)
         accuracy_dict = defaultdict(lambda: defaultdict(list))
+        print("Evaluating videos' Magic KMeans clustering accuracy:")
         for video in tqdm(self.videos_list, total=len(self.videos_list)):
             # Get embeddings and annotations for this video in correct order
             groundtruth = []
@@ -170,5 +171,7 @@ if __name__ == "__main__":
             data_path, embeddings_directory, clustering_method
         )
     )
+    print("Accuracy for each after evaluating using Magic KMeans:")
     print(json.dumps(accuracy_dict, indent=4))
-    print(json.dumps(average_acc_dict, indent=4))
+    print("Average accuracy (overall and per class) using Magic KMeans:")
+    print(json.dumps(average_acc_dict, indent=4), "\n")

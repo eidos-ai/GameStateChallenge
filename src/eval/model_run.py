@@ -55,6 +55,8 @@ def model_run(loader, model, device, output_directory, model_path):
             annotation_ids=annotation_ids,
             embeddings=embeddings,
         )
+        print(f"Successfully saved file '{output_path}'")
+    print("\n")
 
 
 if __name__ == "__main__":
