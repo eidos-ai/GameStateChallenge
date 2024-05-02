@@ -10,6 +10,7 @@ import copy
 from tqdm import tqdm
 import numpy as np
 import logging
+import math
 import json
 from collections import defaultdict
 
@@ -34,8 +35,7 @@ logger.setLevel(logging.INFO)
     
 
 def fit(train_loader, val_loader, model, loss_fn, optimizer, scheduler, n_epochs, device, log_interval, experiment_folder, metrics=[],
-        start_epoch=0, neptune_logger: NeptuneLogger=None, inference_transform=None, model_output_path=None,
-        clustering_method=None):
+        start_epoch=0, neptune_logger: NeptuneLogger=None, inference_transform=None, model_output_path=None, max_batch = math.inf):
     """
     Loaders, model, loss function and metrics should work together for a given task,
     i.e. The model should be able to process data output of loaders,
@@ -48,15 +48,19 @@ def fit(train_loader, val_loader, model, loss_fn, optimizer, scheduler, n_epochs
 
     best_accuracy = 0
     best_clustering_acc = 0
+    # Start with eval
+    valid_loss, average_acc_dict, acc_dict = valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger)
+    neptune_logger.log("valid_loss", valid_loss)
+    
     for epoch in range(start_epoch, n_epochs):
         # Train stage
-        train_loss, _ = train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, metrics, neptune_logger)
+        train_loss, _ = train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, metrics, neptune_logger, max_batch)
         scheduler.step()
         neptune_logger.log("train_loss", train_loss)
         message = 'Epoch: {}/{}. Train set: Average loss: {:.4f}'.format(epoch + 1, n_epochs, train_loss)
         
         # Valid stage
-        valid_loss, average_acc_dict, acc_dict = valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger, clustering_method)
+        valid_loss, average_acc_dict, acc_dict = valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger)
         neptune_logger.log("valid_loss", valid_loss)
         message += '\nEpoch: {}/{}. Validation set: Average loss: {:.4f}'.format(epoch + 1, n_epochs,
                                                                                  valid_loss)
@@ -77,7 +81,7 @@ def fit(train_loader, val_loader, model, loss_fn, optimizer, scheduler, n_epochs
     return model
 
 
-def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, metrics, neptune_logger):
+def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, metrics, neptune_logger, max_batch):
     model.train()
     losses = []
     total_loss = 0
@@ -85,8 +89,11 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
     an_distances = []
     triplet_batches = []
     total_anns = 0
+    batch_size = None
     for batch_idx, (images, anns) in enumerate(train_loader):
         total_anns += images.shape[0]
+        if batch_size is None:
+            batch_size = images.shape[0]
         logger.debug(f"batch image shape {images.shape}")
         videos_ids = anns["video"]
         labels = anns["role_id"]
@@ -117,10 +124,13 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
         ap_distances.append(ap_distance)
         an_distance = loss_outputs[3]
         an_distances.append(an_distance)
-        if (batch_idx % log_interval == 0) or (total_anns == len(train_loader.dataset)):
+        if (batch_idx > 0 and (batch_idx % log_interval == 0)) or (total_anns == len(train_loader.dataset)):
+            samples_epoch = len(train_loader.dataset)
+            if max_batch != math.inf:
+                samples_epoch = min(max_batch * batch_size, samples_epoch)
             message = 'Train: [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                total_anns, len(train_loader.dataset),
-                100. * total_anns / len(train_loader.dataset), np.mean(losses))
+                total_anns, samples_epoch ,
+                100. * total_anns / samples_epoch, np.mean(losses))
             message += '\t Ap Distance: {:.6f}, An Distance {:.6f}, {} triplets'.format(np.mean(ap_distances), 
                                                                              np.mean(an_distances),
                                                                              sum(triplet_batches))
@@ -128,12 +138,13 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
             neptune_logger.log("ap_distance_train", np.mean(ap_distances))
             neptune_logger.log("an_distance_train", np.mean(an_distances))
             neptune_logger.log("train_batch_loss", np.mean(losses))
+            neptune_logger.log("triplet_batches_train", sum(triplet_batches))
             losses = []
             triplet_batches = []
             ap_distances = []
             an_distances = []
-        # if batch_idx > 10:
-        #     break
+        if batch_idx >= max_batch:
+            break
 
     total_loss /= (batch_idx + 1)
     return total_loss, metrics
@@ -183,6 +194,7 @@ def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger):
                 neptune_logger.log("ap_distance_valid", np.mean(ap_distances))
                 neptune_logger.log("an_distance_valid", np.mean(an_distances))
                 neptune_logger.log("valid_batch_loss", np.mean(losses))
+                neptune_logger.log("triplet_batches_test", sum(triplet_batches))
                 losses = []
                 ap_distances = []
                 an_distances = []
@@ -224,7 +236,6 @@ def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger):
             # Run DbScan & log Metrics
             # dbscan_labels = dbscan_cluster.fit(video_embeddings)
             dbscan_metrics = dbscan_eval.video_dbscan_evaluation(video_labels, video_embeddings, dbscan_cluster, video)
-            print(dbscan_metrics)            
             for metric_name, metric_value in dbscan_metrics.__dict__.items():
                 neptune_logger.log(f"DBScan/pergame/{video}/{metric_name}", metric_value)
                 dbscan_metrics_dict[metric_name] = metric_value
@@ -253,21 +264,23 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument('-t', '--train', required=True, help='Path to directory with SoccerNetGSR train split')
+    parser.add_argument('-t', '--train', default="../data/SoccerNetGS/train", required=False, help='Path to directory with SoccerNetGSR train split')
     parser.add_argument('-tgl', "--train_videos_list", required=False, type=str, nargs="+",
-                        default=["SNGS-060", "SNGS-061", "SNGS-063", "SNGS-065", "SNGS-067",
-                                 "SNGS-098", "SNGS-099", "SNGS-100", "SNGS-101", 
-                                 "SNGS-151", "SNGS-153", "SNGS-158"], 
+                        default=None,
+                        # default=["SNGS-060", "SNGS-061", "SNGS-063", "SNGS-065", "SNGS-067",
+                        #          "SNGS-098", "SNGS-099", "SNGS-100", "SNGS-101", 
+                        #          "SNGS-151", "SNGS-153", "SNGS-158"], 
                         help="Video names to use on the train dataset")
-    parser.add_argument('-te', '--test', required=False, help='Path to directory with SoccerNetGSR test split')
+    parser.add_argument('-te', '--test', default="../data/SoccerNetGS/test", required=False, help='Path to directory with SoccerNetGSR test split')
     parser.add_argument('-tegl', "--test_videos_list", required=False, type=str, nargs="+",
                         default=["SNGS-067"],
                         help="Video names to use on the test dataset")
-    parser.add_argument('-v', '--valid', required=True, help='Path to directory with SoccerNetGSR valid split')
+    parser.add_argument('-v', '--valid', default="../data/SoccerNetGS/valid", required=False, help='Path to directory with SoccerNetGSR valid split')
     parser.add_argument('-vgl', "--valid_videos_list", required=False, type=str, nargs="+", 
                         default=["SNGS-021", "SNGS-039", "SNGS-078"], 
                         help="Video names to use on the valid dataset")
     parser.add_argument('-e', '--epochs', type=int, required=False, default=5, help='number of epochs to train model')
+    parser.add_argument('-b', '--batches', type=int, required=False, default=None, help='number of batchs to train model on each epoch')
     parser.add_argument('-lr', '--learning_rate', type=float, required=False, default=1e-4, help='optimizer learning rate')
     parser.add_argument('--n_videos', type=int, required=False, default=1, help='number of different videos per batch')
     parser.add_argument('--n_samples', type=int, required=False, default=99, help='number of samples per video per batch')
@@ -298,6 +311,7 @@ if __name__ == "__main__":
     test_dataset_path = args["test"]
     valid_dataset_path = args["valid"]
     epochs = args["epochs"]
+    batches = args["batches"]
     n_videos_batch = args["n_videos"]
     n_samples_per_video_batch = args["n_samples"]
     out_features = args["out_features"]
@@ -312,6 +326,7 @@ if __name__ == "__main__":
     # Add training parameters to neptune
     neptune_logger = NeptuneLogger(enable_run=args["neptune"], project=args["project"], run_name_or_id=args["name"])
     neptune_logger.param("epochs", epochs)
+    neptune_logger.param("batches", batches)
     neptune_logger.param("n_videos_batch", n_videos_batch)
     neptune_logger.param("n_samples_per_class", n_samples_per_video_batch)
     neptune_logger.param("features", out_features)
@@ -340,10 +355,17 @@ if __name__ == "__main__":
 
     logger.info("Creating train dataset and dataloader")
     train_dataset = SoccerNetGSDataset(train_dataset_path, transform=transform, videos_list=train_videos)
+    # Add Test into Train
+    # test_dataset = SoccerNetGSDataset(test_dataset_path, transform=transform, videos_list=None)
+    # big_train_dataset = torch.utils.data.ConcatDataset([train_dataset, test_dataset])
     train_batch_sampler = SoccerNetGSBatchSampler(train_dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_per_video_batch)
+    # train_dataset = big_train_dataset
+    
     online_train_loader = torch.utils.data.DataLoader(train_dataset, batch_sampler=train_batch_sampler, **kwargs)
     neptune_logger.param("train_path", train_dataset_path)
+    neptune_logger.param("train size", len(train_dataset))
     logger.info(f"Train dataset created with {str(train_videos)}")
+    logger.info(f"Train dataset length {len(train_dataset)}")
     neptune_logger.param("train videos", str(train_videos))
     
     logger.info("Creating validation dataset and dataloader")
@@ -353,9 +375,11 @@ if __name__ == "__main__":
     online_valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_sampler=valid_batch_sampler, **kwargs)
     neptune_logger.param("valid_path", valid_dataset_path)
     logger.info(f"Valid dataset created with {str(valid_videos)}")
+    logger.info(f"Valid dataset length with {len(valid_dataset)}")
     neptune_logger.param("valid videos", str(valid_videos))
+    neptune_logger.param("valid size", len(valid_dataset))
     
-    margin = 1.
+    margin = 2.
     selector_class: TripletSelector = None
     if selector_str == "RandomNegative":
         selector_class = RandomNegativeTripletSelector
@@ -373,11 +397,12 @@ if __name__ == "__main__":
     n_epochs = epochs
     log_interval = 30
     
-    
+    if batches is None:
+        batches = math.inf
     trained_model = fit(online_train_loader, online_valid_loader, model, 
                         loss_fn, optimizer, scheduler, n_epochs, device, 
                         log_interval, experiment_output_dir, neptune_logger=neptune_logger, 
-                        model_output_path=model_output_path)
+                        model_output_path=model_output_path, max_batch=batches)
     
     # Upload model, disabled to save space
     # neptune_logger.upload_file(Path(output_model_path).name, output_model_path)    
