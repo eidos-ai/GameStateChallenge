@@ -72,6 +72,7 @@ class SoccerPersonTripletSelector(TripletSelector):
             label_indices = np.where(label_mask)[0]
             if len(label_indices) < 2:
                 continue
+                
             negative_indices = np.where(np.logical_not(label_mask))[0]
 
             # Positive pairs are same role_id, same video
@@ -82,37 +83,32 @@ class SoccerPersonTripletSelector(TripletSelector):
                 if video_name not in video_dict:
                     video_dict[video_name] = []
                 video_dict[video_name].append(index)
-
-            # Generate all positive pairs within the same video
-            anchor_positives = []
-            for indices in video_dict.values():
-                if len(indices) > 1:
-                    anchor_positives.extend(list(combinations(indices, 2)))
-            # It could happen that there's not any video with two different samples from this class (role_id) on the batch
-            # In that case, its not possible to make a pair, we just skip
-            if len(anchor_positives) == 0:
-                continue
-            anchor_positives = np.array(anchor_positives)
             
-            logger.debug(f"/////////////// anchor-positive pairs for {label}: {len(anchor_positives)}///////////////")
-            anchor_positives = np.array(anchor_positives)
-
-            ap_distances = distance_matrix[anchor_positives[:, 0], anchor_positives[:, 1]]
-            for anchor_positive, ap_distance in zip(anchor_positives, ap_distances):
-                loss_values = ap_distance - distance_matrix[torch.LongTensor(np.array([anchor_positive[0]])), torch.LongTensor(negative_indices)] + self.margin
-                loss_values = loss_values.data.cpu().numpy()
-                logger.debug(f"{loss_values.shape[0]} loss values, max loss {np.max(loss_values)}")
-                hard_negative = self.negative_selection_fn(loss_values)
-                logger.debug(f"hard_negative selection output: {hard_negative}")
-                if hard_negative is not None:
-                    hard_negative = negative_indices[hard_negative]
-                    triplets.append([anchor_positive[0], anchor_positive[1], hard_negative])
-
-        if len(triplets) == 0:
-            triplets.append([anchor_positive[0], anchor_positive[1], negative_indices[0]])
-
+            # Triplets are made within each video.
+            for video_name, video_indices in video_dict.items():
+                if len(video_indices) < 2:
+                    continue
+                combinations_indices = list(combinations(video_indices, 2))
+                
+                for anchor_idx, positive_idx in combinations_indices:
+                    # For negatives, select candidates with different labels within the same video
+                    other_label_indices = [idx for idx in negative_indices if videos[idx] == video_name]
+                    
+                    if not other_label_indices:
+                        continue
+                        
+                    # Compute loss values for each negative candidate
+                    ap_distance = distance_matrix[anchor_idx, positive_idx]
+                    loss_values = ap_distance - distance_matrix[anchor_idx, np.array(other_label_indices)] + self.margin
+                    loss_values = loss_values.data.cpu().numpy()
+                    
+                    # Select the hardest negative using the provided selection function
+                    hard_negative = self.negative_selection_fn(loss_values)
+                    if hard_negative is not None:
+                        hard_negative_idx = other_label_indices[hard_negative]
+                        triplets.append([anchor_idx, positive_idx, hard_negative_idx])
+                        
         triplets = np.array(triplets)
-
         return torch.LongTensor(triplets)
 
 class OnlineTripletLoss(nn.Module):
