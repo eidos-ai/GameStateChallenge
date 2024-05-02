@@ -1,20 +1,24 @@
 import os
 import sys
-import torch
 import numpy as np
 
 parent_dir = os.path.dirname(os.path.dirname(__file__))
 sys.path.append(parent_dir)
-
 from SNGS_dataset.groundtruth_reader import GroundTruthReader
-from scipy.optimize import linear_sum_assignment
-from sklearn.metrics import confusion_matrix
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass
 from collections import defaultdict
-from typing import Any
+from typing import Any, List, Dict
 from dbscan_clustering import DBScanClustering
 from tqdm import tqdm
 from sklearn import metrics
+
+
+@dataclass(frozen=True)
+class Metrics:
+    video: str
+    predicted_clusters: int
+    homogeneity: float
+    completeness: float
 
 
 def load_embeddings(embeddings_directory: str, video_name: str) -> Any:
@@ -32,94 +36,86 @@ def load_embeddings(embeddings_directory: str, video_name: str) -> Any:
     return annotation_ids, embeddings
 
 
-def get_average_dict(metrics_dict):
+def load_data(
+    dataset_path: str,
+    embeddings_directory: str,
+    videos_list: List[str],
+) -> Any:
+    """Loads data for evaluation"""
+    if videos_list is None:
+        videos_list = [
+            video for video in os.listdir(dataset_path) if video[:5] != "SNGS-"
+        ]
+    gt_reader = GroundTruthReader(dataset_path, videos_list)
+    embeddings_dict = defaultdict(lambda: defaultdict(list))
+    groundtruth_dict = defaultdict(lambda: defaultdict(list))
+
+    for video in tqdm(videos_list, total=len(videos_list)):
+        # Get embeddings and annotations for this video in correct order
+        video_groundtruth = []
+        video_gt = gt_reader.get_annotations_from_video(video)
+        video_annotations_ids, video_embeddings = load_embeddings(
+            embeddings_directory, video
+        )
+        assert len(video_annotations_ids) == len(
+            video_embeddings
+        ), "The annotations and embeddings lists have different lengths"
+        for ann_id in video_annotations_ids:
+            for annotation in video_gt:
+                if annotation.annotation_id == ann_id:
+                    video_groundtruth.append(annotation.role_id)
+                    break
+        # At this point, I have video_groundtruth and video_embeddings
+        embeddings_dict[video] = video_embeddings
+        groundtruth_dict[video] = video_groundtruth
+    return embeddings_dict, groundtruth_dict
+
+
+def get_average_metrics(metrics_list: List[Metrics]):
     """Get the average metrics of all videos."""
     avg_dict = defaultdict(float)
-    for video in metrics_dict.keys():
-        for metric in metrics_dict[video].keys():
-            if metric != "predicted_clusters":
-                avg_dict[f"{metric}_average"] += metrics_dict[video][metric]
+    for video_metrics in metrics_list:
+        temp_dict = asdict(video_metrics)
+        for metric in temp_dict.keys():
+            if metric != "predicted_clusters" and metric != "video":
+                avg_dict[f"{metric}_average"] += temp_dict[metric]
     for metric in avg_dict.keys():
-        avg_dict[metric] /= len(metrics_dict)
+        avg_dict[metric] /= len(metrics_list)
         avg_dict[metric] = round(avg_dict[metric], 3)
     return avg_dict
 
 
-@dataclass(frozen=True)
-class Metrics:
-    predicted_clusters: int
-    homogeneity: float
-    completeness: float
-
-
 class DBScanEvaluation:
-    def __init__(self, videos_list: list[str] = None):
-        self.videos_list = videos_list
-
-    def video_dbscan_evaluation(
+    def videos_dbscan_evaluation(
         self,
-        gt_cluster_ids: list[int],
-        embeddings: list[Any],
+        annotations_dict: Dict[str, Any],
+        embeddings_dict: Dict[str, Any],
         clustering_method: DBScanClustering,
-    ) -> dict[str:Any]:
-        """Evaluates clustering from on-memory data"""
-        assert len(gt_cluster_ids) == len(
-            embeddings
-        ), "The annotations and embeddings lists have different lengths"
-        predictions = clustering_method.fit(embeddings)
-        clusters_count = len(set(predictions))
-        video_metrics = Metrics(
-            predicted_clusters=(
-                clusters_count - 1 if -1 in predictions else clusters_count
-            ),
-            homogeneity=round(
-                metrics.homogeneity_score(gt_cluster_ids, predictions), 3
-            ),
-            completeness=round(
-                metrics.completeness_score(gt_cluster_ids, predictions), 3
-            ),
-        )
-        # metrics_dict = defaultdict(float)
-        # metrics_dict["clusters_count"] = clusters_count - 1 if -1 in clusters_count else clusters_count
-        # metrics_dict["homogeneity"] = round(metrics.homogeneity_score(gt_cluster_ids, predictions), 3)
-        # metrics_dict["completeness"] = round(metrics.completeness_score(gt_cluster_ids, predictions), 3)
-        # metrics_dict["adjusted_rand_index"] = round(metrics.adjusted_rand_score(gt_cluster_ids, predictions), 3)
-        # metrics_dict["silhouette_coefficient"] = round(metrics.silhouette_score(embeddings, predictions), 3)
-        # return metrics_dict
-        return video_metrics
+    ) -> Any:
+        """Evaluates clustering for all videos"""
+        assert len(annotations_dict.keys()) == len(
+            embeddings_dict.keys()
+        ), "Different number of videos in annotations and embeddings"
+        total_metrics = []
+        for video in annotations_dict.keys():
+            predictions = clustering_method.fit(embeddings_dict[video])
+            clusters_count = len(set(predictions))
+            video_metrics = Metrics(
+                video=video,
+                predicted_clusters=(
+                    clusters_count - 1 if -1 in predictions else clusters_count
+                ),
+                homogeneity=round(
+                    metrics.homogeneity_score(annotations_dict[video], predictions), 3
+                ),
+                completeness=round(
+                    metrics.completeness_score(annotations_dict[video], predictions), 3
+                ),
+            )
+            total_metrics.append(video_metrics)
+        average_metrics = get_average_metrics(total_metrics)
 
-    def stored_videos_dbscan_evaluation(
-        self,
-        dataset_path: str,
-        embeddings_directory: str,
-        clustering_method: DBScanClustering,
-    ) -> dict[str:Any]:
-        """Loads data to evaluate clustering"""
-        if self.videos_list is None:
-            self.videos_list = [
-                video for video in os.listdir(dataset_path) if video[:5] != "SNGS-"
-            ]
-        gt_reader = GroundTruthReader(dataset_path, self.videos_list)
-        metrics_dict = defaultdict(lambda: defaultdict(list))
-        for video in tqdm(self.videos_list, total=len(self.videos_list)):
-            # Get embeddings and annotations for this video in correct order
-            groundtruth = []
-            video_gt = gt_reader.get_annotations_from_video(video)
-            video_embeddings_annotations_ids, video_embeddings = load_embeddings(
-                embeddings_directory, video
-            )
-            for ann_id in video_embeddings_annotations_ids:
-                for annotation in video_gt:
-                    if annotation.annotation_id == ann_id:
-                        groundtruth.append(annotation.role_id)
-                        break
-            # Perform clustering fit and eval with video embeddings and annotations
-            video_metrics = self.video_dbscan_evaluation(
-                groundtruth, video_embeddings, clustering_method, video
-            )
-            metrics_dict[video] = asdict(video_metrics)
-        average_dict = get_average_dict(metrics_dict)
-        return average_dict, metrics_dict
+        return average_metrics, total_metrics
 
 
 if __name__ == "__main__":
@@ -176,11 +172,16 @@ if __name__ == "__main__":
     eps = args["eps"]
     min_samples = args["min_samples"]
 
-    clustering_evaluation = DBScanEvaluation(videos_list)
+    clustering_evaluation = DBScanEvaluation()
     clustering_method = DBScanClustering(eps=eps, min_samples=min_samples)
-    average_dict, metrics_dict = clustering_evaluation.stored_videos_dbscan_evaluation(
-        data_path, embeddings_directory, clustering_method
+    embeddings_dict, annotations_dict = load_data(
+        data_path, embeddings_directory, videos_list
+    )
+    average_dict, metrics_list = clustering_evaluation.videos_dbscan_evaluation(
+        annotations_dict, embeddings_dict, clustering_method
     )
 
-    print(json.dumps(metrics_dict, indent=4, cls=MyEncoder))
+    for item in metrics_list:
+        print(item)
+
     print(json.dumps(average_dict, indent=4, cls=MyEncoder))
