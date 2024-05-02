@@ -7,7 +7,7 @@ sys.path.append(parent_dir)
 from SNGS_dataset.groundtruth_reader import GroundTruthReader
 from dataclasses import asdict, dataclass
 from collections import defaultdict
-from typing import Any, List, Dict
+from typing import Any, List, Dict, Tuple
 from dbscan_clustering import DBScanClustering
 from tqdm import tqdm
 from sklearn import metrics
@@ -15,10 +15,14 @@ from sklearn import metrics
 
 @dataclass(frozen=True)
 class Metrics:
-    video: str
-    predicted_clusters: int
     homogeneity: float
     completeness: float
+    predicted_clusters: int = None
+    video: str = None
+    
+    def __repr__(self):
+        props = [f"{k}={v}" for k, v in self.__dict__.items() if v is not None]
+        return f"Metrics({', '.join(props)})"
 
 
 def load_embeddings(embeddings_directory: str, video_name: str) -> Any:
@@ -41,7 +45,7 @@ def load_data(
     embeddings_directory: str,
     videos_list: List[str],
     clustering_method: DBScanClustering,
-) -> Any:
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Loads data for evaluation"""
     if videos_list is None:
         videos_list = [
@@ -73,7 +77,7 @@ def load_data(
     return predictions_dict, groundtruth_dict
 
 
-def get_average_metrics(metrics_list: List[Metrics]):
+def get_average_metrics(metrics_list: List[Metrics]) -> Metrics:
     """Get the average metrics of all videos."""
     avg_dict = defaultdict(float)
     for video_metrics in metrics_list:
@@ -84,7 +88,8 @@ def get_average_metrics(metrics_list: List[Metrics]):
     for metric in avg_dict.keys():
         avg_dict[metric] /= len(metrics_list)
         avg_dict[metric] = round(avg_dict[metric], 3)
-    return avg_dict
+    
+    return Metrics(homogeneity=avg_dict["homogeneity"], completeness=avg_dict["completeness"])
 
 
 class DBScanEvaluation:
@@ -92,7 +97,7 @@ class DBScanEvaluation:
         self,
         predicctions_dict: Dict[str, Any],
         groundtruth_dict: Dict[str, Any],
-    ) -> Any:
+    ) -> Tuple[Dict[str, Any], List[Metrics]]:
         """Evaluates clustering for all videos"""
         assert len(predicctions_dict.keys()) == len(
             groundtruth_dict.keys()
@@ -187,11 +192,10 @@ if __name__ == "__main__":
     )
 
     clustering_evaluation = DBScanEvaluation()
-    average_dict, metrics_list = clustering_evaluation.videos_dbscan_evaluation(
+    average_metrics, metrics_list = clustering_evaluation.videos_dbscan_evaluation(
         predictions_dict, groundtruth_dict
     )
 
     for item in metrics_list:
         print(item)
-
-    print(json.dumps(average_dict, indent=4, cls=MyEncoder))
+    print(average_metrics)
