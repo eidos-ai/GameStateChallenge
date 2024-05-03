@@ -55,7 +55,6 @@ def load_data(
     predictions_dict = defaultdict(lambda: defaultdict(list))
     groundtruth_dict = defaultdict(lambda: defaultdict(list))
 
-    print("Evaluating videos' DBSCAN clustering:")
     for video in tqdm(videos_list, total=len(videos_list)):
         # Get embeddings and annotations for this video in correct order
         video_groundtruth = []
@@ -85,7 +84,7 @@ def get_average_metrics(metrics_list: List[Metrics]) -> Metrics:
         temp_dict = asdict(video_metrics)
         for metric in temp_dict.keys():
             if metric != "predicted_clusters" and metric != "video":
-                avg_dict[f"{metric}_average"] += temp_dict[metric]
+                avg_dict[metric] += temp_dict[metric]
     for metric in avg_dict.keys():
         avg_dict[metric] /= len(metrics_list)
         avg_dict[metric] = round(avg_dict[metric], 3)
