@@ -234,11 +234,15 @@ def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger):
             neptune_logger.log(f"MagicKMeans/pergame/{video}", video_accuracy)
             
             # Run DbScan & log Metrics
-            # dbscan_labels = dbscan_cluster.fit(video_embeddings)
-            dbscan_metrics = dbscan_eval.video_dbscan_evaluation(video_labels, video_embeddings, dbscan_cluster, video)
+            dbscan_labels = dbscan_cluster.fit(video_embeddings)
+            dbscan_labels_asdict = {video: dbscan_labels}
+            video_labels_asdict = {video: video_labels}
+            _, dbscan_metrics = dbscan_eval.videos_dbscan_evaluation(dbscan_labels_asdict, video_labels_asdict)
+            dbscan_metrics = dbscan_metrics[0]
             for metric_name, metric_value in dbscan_metrics.__dict__.items():
-                neptune_logger.log(f"DBScan/pergame/{video}/{metric_name}", metric_value)
-                dbscan_metrics_dict[metric_name] = metric_value
+                if metric_name != "video":
+                    neptune_logger.log(f"DBScan/pergame/{video}/{metric_name}", metric_value)
+                    dbscan_metrics_dict[metric_name] = metric_value
             
         average_acc_dict = get_accuracy_average(accuracy_dict)
         # Log averaged metrics from all videos
