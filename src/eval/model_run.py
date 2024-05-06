@@ -2,9 +2,11 @@ import torch
 import sys
 import os
 import numpy as np
-sys.path.append("..")
-sys.path.append("../models")
-sys.path.append("../SNGS_dataset")
+
+
+parent_dir = os.path.dirname(os.path.dirname(__file__))
+sys.path.append(parent_dir)
+
 from tqdm import tqdm
 from typing import Any
 from models.resnet import ResnetMLP
@@ -22,7 +24,11 @@ def model_run(loader, model, device, output_directory, model_path):
     with torch.no_grad():
         model.eval()
         # Iterate over every batch
-        for batch_idx, (images, labels) in tqdm(enumerate(loader), desc="Generating embeddings from every batch", total=len(loader)):
+        for batch_idx, (images, labels) in tqdm(
+            enumerate(loader),
+            desc="Generating embeddings from every batch",
+            total=len(loader),
+        ):
             # Get embeddings from batch of images
             images = images.to(device)
             embeddings = model(images)
@@ -31,15 +37,26 @@ def model_run(loader, model, device, output_directory, model_path):
             batch_size = images.shape[0]
             for batch_element_idx in range(batch_size):
                 video = labels["video"][batch_element_idx]
-                embeddings_per_video[video]["annotation_ids"].append(labels["annotation_id"][batch_element_idx])
-                embeddings_per_video[video]["embeddings"].append(embeddings_array[batch_element_idx])
+                embeddings_per_video[video]["annotation_ids"].append(
+                    labels["annotation_id"][batch_element_idx]
+                )
+                embeddings_per_video[video]["embeddings"].append(
+                    embeddings_array[batch_element_idx]
+                )
     os.makedirs(output_directory, exist_ok=True)
     for video, data in embeddings_per_video.items():
         model_path_arr = np.array([model_path])
         annotation_ids = np.array(data["annotation_ids"])
         embeddings = np.array(data["embeddings"])
         output_path = os.path.join(output_directory, f"{video}_embeddings.npz")
-        np.savez(output_path, model_path=model_path_arr, annotation_ids=annotation_ids, embeddings=embeddings)
+        np.savez(
+            output_path,
+            model_path=model_path_arr,
+            annotation_ids=annotation_ids,
+            embeddings=embeddings,
+        )
+        print(f"Successfully saved file '{output_path}'")
+    print("\n")
 
 
 if __name__ == "__main__":
@@ -72,23 +89,22 @@ if __name__ == "__main__":
         "--mlp_output_size",
         type=int,
         required=False,
-        default=64,
+        default=512,
         help="Output features size for the MLP",
     )
     parser.add_argument(
-        "--games_list",
+        "--videos_list",
         type=str,
         required=False,
         nargs="+",
         default=None,
-        help="List of games to use for inference",
+        help="List of videos to use for inference",
     )
     parser.add_argument(
         "--data_path",
         type=str,
-        required=False,
-        default="../../data/SoccerNetGS/train",
-        help="Path to the data",
+        required=True,
+        help="Path to the data (train, valid or test)",
     )
     parser.add_argument(
         "--n_videos",
@@ -133,13 +149,13 @@ if __name__ == "__main__":
     backbone = args["backbone"]
     hidden_layers = args["hidden_layers"]
     mlp_output_size = args["mlp_output_size"]
-    games_list = args["games_list"]
+    videos_list = args["videos_list"]
     data_path = args["data_path"]
     n_videos_batch = args["n_videos"]
     n_samples_video_batch = args["n_samples"]
     num_workers = args["num_workers"]
     output_path = args["output_path"]
-    
+
     # Load model
     model = ResnetMLP(
         resnet_model=backbone,
@@ -151,8 +167,12 @@ if __name__ == "__main__":
     model.eval()
 
     # Load data
-    dataset = SoccerNetGSDataset(dataset_path=data_path, games_list=games_list, transform=TRANSFORM)
-    sampler = SoccerNetGSBatchSampler(dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_video_batch)
+    dataset = SoccerNetGSDataset(
+        dataset_path=data_path, videos_list=videos_list, transform=TRANSFORM
+    )
+    sampler = SoccerNetGSBatchSampler(
+        dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_video_batch
+    )
     loader = DataLoader(dataset, batch_sampler=sampler, num_workers=num_workers)
 
     model_run(loader, model, device, output_path, model_path)
