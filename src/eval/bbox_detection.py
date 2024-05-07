@@ -1,9 +1,10 @@
 import os
 import cv2
 from tqdm import tqdm
+from typing import List
 from ultralytics import YOLO
 
-def extract_persons_crops_from_videos(model_path, data_path, output_folder, videos_list):
+def extract_persons_crops_from_videos(model_path: str, data_path: str, output_folder: str, videos_list: List[str]) -> None:
     model = YOLO(model_path)
 
     os.makedirs(output_folder, exist_ok=True)
@@ -26,10 +27,10 @@ def extract_persons_crops_from_videos(model_path, data_path, output_folder, vide
                     continue
                 box = item.xywh[0].tolist()
                 box = [int(round(num)) for num in box]
-                crop_img = img[box[1]-int(round(box[3]/2)):box[1]+int(round(box[3]/2)), box[0]-int(round(box[2]/2)):box[0]+int(round(box[2]/2))]
-                output_path = os.path.join(output_video_folder, f"{frame[:-4]}_{str(count).zfill(2)}.jpg")
-                count += 1
                 try:
+                    crop_img = img[box[1]-int(round(box[3]/2)):box[1]+int(round(box[3]/2)), box[0]-int(round(box[2]/2)):box[0]+int(round(box[2]/2))]
+                    output_path = os.path.join(output_video_folder, f"{frame[:-4]}_{str(count).zfill(2)}.jpg")
+                    count += 1
                     cv2.imwrite(output_path, crop_img)
                 except:
                     continue
