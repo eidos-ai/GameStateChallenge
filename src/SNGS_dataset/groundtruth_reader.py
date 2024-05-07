@@ -1,7 +1,7 @@
 import os
 import json
+from typing import Any, Optional
 import logging
-from typing import Any
 from dataclasses import dataclass, field, asdict
 import pandas as pd
 
@@ -56,7 +56,7 @@ class Annotation:
 
 
 class GroundTruthReader:
-    def __init__(self, dataset_path: str, videos_list: list[str]) -> None:
+    def __init__(self, dataset_path: str, videos_list: Optional[list[str]]) -> None:
         self.dataset_path = dataset_path
         self.videos_list = videos_list
         self.person_categories = [1, 2, 3, 7]  # 1: player, 2: goalkeeper, 3: referee, 7: other

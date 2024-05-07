@@ -58,11 +58,10 @@ class PRTReId(torch.nn.Module):
     def forward(self, model_input_tensor: torch.Tensor):
         model_output = self.feature_extractor.model(model_input_tensor, external_parts_masks=None)
         embeddings, visibility_scores, id_cls_scores, team_cls_score, role_cls_score, pixels_cls_scores, spatial_features, parts_masks = model_output
-        
-        if self.training:
-            return None, embeddings[self.target_embeddings]
-        else:
-            return embeddings[self.target_embeddings]
+        embeddings = embeddings[self.target_embeddings]
+        if self.target_embeddings == "parts":
+            embeddings = embeddings.squeeze(dim = 1)
+        return embeddings
     
     def preprocess_pil_image(self, pil_image: Image):
         image_array = np.array(pil_image)
