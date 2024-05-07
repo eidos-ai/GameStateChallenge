@@ -7,7 +7,6 @@ from shutil import copy2
 from torchvision import transforms
 from sklearn.cluster import DBSCAN
 from models.resnet import ResnetMLP
-from collections import defaultdict
 
 
 def cluster_bboxes_on_video(model: ResnetMLP, data_path: str, bbox_path: str, output_path: str, videos_list: List[str], transform: transforms, dbscan: DBSCAN) -> None:
@@ -16,8 +15,9 @@ def cluster_bboxes_on_video(model: ResnetMLP, data_path: str, bbox_path: str, ou
         videos_list = [item for item in videos_list if item[:5] == "SNGS-"]
 
     with torch.no_grad():
-        model.eval()
         for video in tqdm(videos_list, total=len(videos_list), desc="Videos iteration"):
+            video_embeddings = []
+            video_crops = []
             frames_directory = os.path.join(bbox_path, video)
             crops = os.listdir(frames_directory)
             for crop in tqdm(crops, total=len(crops), desc=f"Crops of video {video}"):
@@ -28,14 +28,20 @@ def cluster_bboxes_on_video(model: ResnetMLP, data_path: str, bbox_path: str, ou
                 pil_img = transform(pil_img).unsqueeze(0)
                 img = pil_img.to(device)
                 embeddings = model(img)
-                embeddings_array = embeddings.cpu().numpy()
-                model_output = dbscan.fit(embeddings_array)
-                predictions = model_output.labels_
-                prediction_dir = os.path.join(output_path, video, str(predictions[0]))
-                if predictions[0] != -1:
-                    print(predictions[0])
+                embeddings_array = embeddings.cpu().numpy().flatten()
+                video_embeddings.append(embeddings_array) 
+                video_crops.append(crop)
+   
+            model_output = dbscan.fit(video_embeddings)
+            predictions = model_output.labels_
+            for i in range(len(predictions)):
+                prediction_dir = os.path.join(output_path, video, str(predictions[i]))
                 os.makedirs(prediction_dir, exist_ok=True)
-                copy2(crop_path, prediction_dir)
+                crop_path = os.path.join(frames_directory, crops[i])
+                try:
+                    copy2(crop_path, prediction_dir)
+                except:
+                    continue
 
 
 if __name__ == "__main__":
