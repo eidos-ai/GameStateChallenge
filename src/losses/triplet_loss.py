@@ -127,19 +127,29 @@ class OnlineTripletLoss(nn.Module):
     def forward(self, embeddings, target, videos):
         
         triplets = self.triplet_selector.get_triplets(embeddings, target, videos)
+        if len(triplets) > 0:
+            valid_loss = True
+            if embeddings.is_cuda:
+                triplets = triplets.cuda()
 
-        if embeddings.is_cuda:
-            triplets = triplets.cuda()
-        
-        # Triplets are given as image_index, anchor_positive_index, anchor_negative_index.
-        # So last indexes are taken from anchors_embeddings
-        ap_distances = distance(embeddings[triplets[:, 0]], embeddings[triplets[:, 1]])
-        an_distances = distance(embeddings[triplets[:, 0]], embeddings[triplets[:, 2]])
-        losses = F.relu(ap_distances - an_distances + self.margin)
-        
-        ap_distances_mean = ap_distances.mean().item()
-        an_distances_mean = an_distances.mean().item()
-        return losses.mean(), len(triplets), ap_distances_mean, an_distances_mean, triplets, losses
+            # Triplets are given as image_index, anchor_positive_index, anchor_negative_index.
+            # So last indexes are taken from anchors_embeddings
+            ap_distances = distance(embeddings[triplets[:, 0]], embeddings[triplets[:, 1]])
+            an_distances = distance(embeddings[triplets[:, 0]], embeddings[triplets[:, 2]])
+            losses = F.relu(ap_distances - an_distances + self.margin)
+
+            ap_distances_mean = ap_distances.mean().item()
+            an_distances_mean = an_distances.mean().item()
+            mean_loss = losses.mean()
+            n_triplets = len(triplets)
+        else:
+            valid_loss = False
+            mean_loss = None
+            n_triplets = 0
+            ap_distances_mean = None
+            an_distances_mean = None
+            
+        return valid_loss, mean_loss, n_triplets, ap_distances_mean, an_distances_mean
 
 
 class AllTripletSelector(TripletSelector):

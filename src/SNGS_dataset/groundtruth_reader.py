@@ -1,9 +1,13 @@
 import os
 import json
 from typing import Any, Optional
+import logging
 from dataclasses import dataclass, field, asdict
 import pandas as pd
 
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 LABELS_MAP = {
     "player_left": 0,
@@ -68,10 +72,12 @@ class GroundTruthReader:
             if not os.path.isdir(video_path):
                 continue
             try:
+                labels_path = os.path.join(video_path, "Labels-GameState.json")
                 labels_data = json.load(
-                    open(os.path.join(video_path, "Labels-GameState.json"))
+                    open(labels_path)
                 )
             except FileNotFoundError:
+                logger.info(f"Labels file not found {labels_path}")
                 continue
             for annotation in labels_data["annotations"]:
                 if annotation["category_id"] not in self.person_categories:

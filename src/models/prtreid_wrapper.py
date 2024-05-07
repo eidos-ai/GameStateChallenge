@@ -16,12 +16,16 @@ from prtreid.utils.tools import extract_test_embeddings
 
 class PRTReId(torch.nn.Module):
     def __init__(self, model_path: str, hrnet_dir: str, config_path: str,
-                device: str):
+                device: str, target_embeddings="globl"):
+        """
+        target_embeddings can be one of 'globl', 'foreg', 'conct', 'parts'
+        """
         super(PRTReId, self).__init__()
         
         self.model_path = model_path
         self.hrnet_dir = hrnet_dir
         self.config_path = config_path
+        self.target_embeddings=target_embeddings
         
         cfg = OmegaConf.load(config_path)
         cfg = cfg.cfg
@@ -45,23 +49,19 @@ class PRTReId(torch.nn.Module):
         
         self.preprocess = self.feature_extractor.preprocess
         
-    def get_embeddings(self, model_input: Any, target_embeddings: str="globl"):
+    def get_embeddings(self, model_input: Any):
         prtreid_result = self.feature_extractor(model_input, external_parts_masks=None)
-        embeddings, vis_scores, embeddings_masks, pixels_cls_scores, role_cls_score = extract_test_embeddings(prtreid_result, [target_embeddings])
+        embeddings, vis_scores, embeddings_masks, pixels_cls_scores, role_cls_score = extract_test_embeddings(prtreid_result, [self.target_embeddings])
         
         return embeddings.squeeze(1)
     
-    def forward(self, model_input_tensor: torch.Tensor, target_embeddings: str="globl"):
-        """
-        target_embeddings can be one of 'globl', 'foreg', 'conct', 'parts'
-        """
+    def forward(self, model_input_tensor: torch.Tensor):
         model_output = self.feature_extractor.model(model_input_tensor, external_parts_masks=None)
         embeddings, visibility_scores, id_cls_scores, team_cls_score, role_cls_score, pixels_cls_scores, spatial_features, parts_masks = model_output
-        
-        if self.training:
-            return None, embeddings[target_embeddings]
-        else:
-            return embeddings[target_embeddings]
+        embeddings = embeddings[self.target_embeddings]
+        if self.target_embeddings == "parts":
+            embeddings = embeddings.squeeze(dim = 1)
+        return embeddings
     
     def preprocess_pil_image(self, pil_image: Image):
         image_array = np.array(pil_image)
@@ -96,7 +96,7 @@ if __name__ == "__main__":
     config_path = args["config"]
     hrnet_dir = args["hrnet_pretrained"]
     
-    prtreid = PRTReId(model_path, hrnet_dir, config_path, device)
+    prtreid = PRTReId(model_path, hrnet_dir, config_path, device, 'globl')
 
     sample_batch_images = ["sample_crop.png", "sample_crop.png"]
     model_input_pils = [Image.open(img_path).convert("RGB") for img_path in sample_batch_images] 
@@ -106,17 +106,18 @@ if __name__ == "__main__":
     
     # This section simulates getting embeddings when training model
     prtreid.train()
-    embeddings_with_grad = prtreid(preprocessed_inputs, 'globl')
+    embeddings_with_grad = prtreid(preprocessed_inputs)
 
     # This section simulates getting embeddings when evaluating model
     prtreid.eval()
     with torch.no_grad():
-        embeddings = prtreid(preprocessed_inputs, 'globl')
+        embeddings = prtreid(preprocessed_inputs)
         print(embeddings[0])
-        
-    torch.save(prtreid, "eidos_prtreid_base.pt")
-    loaded_prtreid = torch.load("eidos_prtreid_base.pt")
+    prtreid.train()
+    torch.save(prtreid, "../../pretrained_models/reid/eidos_prtreid_base.pt")
+    # This section simulates loading the model and getting embeddings. Printed tensor should be the same as last section
+    loaded_prtreid = torch.load("../../pretrained_models/reid/eidos_prtreid_base.pt")
     loaded_prtreid.eval()
     with torch.no_grad():
-        embeddings_loaded_model = loaded_prtreid(preprocessed_inputs, 'globl')
+        embeddings_loaded_model = loaded_prtreid(preprocessed_inputs)
         print(embeddings_loaded_model[0])
