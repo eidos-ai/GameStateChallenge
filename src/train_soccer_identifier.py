@@ -23,6 +23,7 @@ from losses.triplet_loss import distance as triplet_loss_distance
 
 from models.resnet import ResnetMLP
 from models.resnet import TRANSFORM as RESNET_TRANSFORM
+from models.prtreid_wrapper import PRTReId
 
 from eval.magic_kmeans_clustering import MagicKmeansClustering
 from eval.clustering_accuracy_evaluation import ClusteringAccuracyEvaluation, get_accuracy_average
@@ -49,35 +50,38 @@ def fit(train_loader, val_loader, model, loss_fn, optimizer, scheduler, n_epochs
     best_accuracy = 0
     best_clustering_acc = 0
     # Start with eval
-    valid_loss, average_acc_dict, acc_dict = valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger)
-    neptune_logger.log("valid_loss", valid_loss)
+    # valid_loss, average_acc_dict, acc_dict = valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger)
+    # neptune_logger.log("valid_loss", valid_loss)
     
     for epoch in range(start_epoch, n_epochs):
-        # Train stage
-        train_loss, _ = train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, metrics, neptune_logger, max_batch)
-        scheduler.step()
-        neptune_logger.log("train_loss", train_loss)
-        message = 'Epoch: {}/{}. Train set: Average loss: {:.4f}'.format(epoch + 1, n_epochs, train_loss)
-        
-        # Valid stage
-        valid_loss, average_acc_dict, acc_dict = valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger)
-        neptune_logger.log("valid_loss", valid_loss)
-        message += '\nEpoch: {}/{}. Validation set: Average loss: {:.4f}'.format(epoch + 1, n_epochs,
-                                                                                 valid_loss)
-        print(json.dumps(average_acc_dict, indent=4))
-        clustering_acc = average_acc_dict["overall"]
-        
-        if clustering_acc > best_clustering_acc:
-            best_clustering_acc = clustering_acc
-            torch.save(model.state_dict(), model_output_path)
-            
-        # Save model every epoch
-        folder_save_model_path = Path(experiment_folder, "models")
-        folder_save_model_path.mkdir(parents=True, exist_ok=True)
-        save_model_path = Path(folder_save_model_path, f"epoch_{epoch}.pt")
-        torch.save(model.state_dict(), save_model_path)
-        
-        print(message)
+        try:
+            # Train stage
+            train_loss, _ = train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, metrics, neptune_logger, max_batch)
+            scheduler.step()
+            neptune_logger.log("train_loss", train_loss)
+            message = 'Epoch: {}/{}. Train set: Average loss: {:.4f}'.format(epoch + 1, n_epochs, train_loss)
+
+            # Valid stage
+            valid_loss, average_acc_dict, acc_dict = valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger)
+            neptune_logger.log("valid_loss", valid_loss)
+            message += '\nEpoch: {}/{}. Validation set: Average loss: {:.4f}'.format(epoch + 1, n_epochs,
+                                                                                     valid_loss)
+            print(json.dumps(average_acc_dict, indent=4))
+            clustering_acc = average_acc_dict["overall"]
+
+            if clustering_acc > best_clustering_acc:
+                best_clustering_acc = clustering_acc
+                torch.save(model.state_dict(), model_output_path)
+
+            # Save model every epoch
+            folder_save_model_path = Path(experiment_folder, "models")
+            folder_save_model_path.mkdir(parents=True, exist_ok=True)
+            save_model_path = Path(folder_save_model_path, f"epoch_{epoch}.pt")
+            torch.save(model.state_dict(), save_model_path)
+
+            print(message)
+        except Exception as e:
+            logger.exception(e)
     return model
 
 
@@ -91,60 +95,61 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
     total_anns = 0
     batch_size = None
     for batch_idx, (images, anns) in enumerate(train_loader):
-        total_anns += images.shape[0]
-        if batch_size is None:
-            batch_size = images.shape[0]
-        logger.debug(f"batch image shape {images.shape}")
-        videos_ids = anns["video"]
-        labels = anns["role_id"]
-        
-        logger.debug(f"Moving to device")
-        
-        images = images.to(device)
-        labels = labels.to(device)
+        try:
+            total_anns += images.shape[0]
+            if batch_size is None:
+                batch_size = images.shape[0]
+            logger.debug(f"batch image shape {images.shape}")
+            videos_ids = anns["video"]
+            labels = anns["role_id"]
 
-        logger.debug(f"Going into model")
-    
-        optimizer.zero_grad()
-        
-        _ , embeddings = model(images)
+            logger.debug(f"Moving to device")
 
-        loss_outputs = loss_fn(embeddings, labels, videos_ids)
-        
-        logger.debug("loss")
-        loss = loss_outputs[0] if type(loss_outputs) in (tuple, list) else loss_outputs
-        losses.append(loss.item())
-        total_loss += loss.item()
-        loss.backward()
-        optimizer.step()
-        
-        num_triplets = loss_outputs[1]
-        triplet_batches.append(num_triplets)
-        ap_distance = loss_outputs[2]
-        ap_distances.append(ap_distance)
-        an_distance = loss_outputs[3]
-        an_distances.append(an_distance)
-        if (batch_idx > 0 and (batch_idx % log_interval == 0)) or (total_anns == len(train_loader.dataset)):
-            samples_epoch = len(train_loader.dataset)
-            if max_batch != math.inf:
-                samples_epoch = min(max_batch * batch_size, samples_epoch)
-            message = 'Train: [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                total_anns, samples_epoch ,
-                100. * total_anns / samples_epoch, np.mean(losses))
-            message += '\t Ap Distance: {:.6f}, An Distance {:.6f}, {} triplets'.format(np.mean(ap_distances), 
-                                                                             np.mean(an_distances),
-                                                                             sum(triplet_batches))
-            print(message)
-            neptune_logger.log("ap_distance_train", np.mean(ap_distances))
-            neptune_logger.log("an_distance_train", np.mean(an_distances))
-            neptune_logger.log("train_batch_loss", np.mean(losses))
-            neptune_logger.log("triplet_batches_train", sum(triplet_batches))
-            losses = []
-            triplet_batches = []
-            ap_distances = []
-            an_distances = []
-        if batch_idx >= max_batch:
-            break
+            images = images.to(device)
+            labels = labels.to(device)
+
+            logger.debug(f"Going into model")
+
+            optimizer.zero_grad()
+
+            embeddings = model(images)
+            
+            loss_ok, mean_loss, num_triplets, ap_distance, an_distance = loss_fn(embeddings, labels, videos_ids)
+            if not loss_ok:
+                continue
+                
+            loss = mean_loss
+            losses.append(loss.item())
+            total_loss += loss.item()
+            loss.backward()
+            optimizer.step()
+
+            triplet_batches.append(num_triplets)
+            ap_distances.append(ap_distance)
+            an_distances.append(an_distance)
+            if (batch_idx > 0 and (batch_idx % log_interval == 0)) or (total_anns == len(train_loader.dataset)):
+                samples_epoch = len(train_loader.dataset)
+                if max_batch != math.inf:
+                    samples_epoch = min(max_batch * batch_size, samples_epoch)
+                message = 'Train: [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                    total_anns, samples_epoch ,
+                    100. * total_anns / samples_epoch, np.mean(losses))
+                message += '\t Ap Distance: {:.6f}, An Distance {:.6f}, {} triplets'.format(np.mean(ap_distances), 
+                                                                                 np.mean(an_distances),
+                                                                                 sum(triplet_batches))
+                print(message)
+                neptune_logger.log("ap_distance_train", np.mean(ap_distances))
+                neptune_logger.log("an_distance_train", np.mean(an_distances))
+                neptune_logger.log("train_batch_loss", np.mean(losses))
+                neptune_logger.log("triplet_batches_train", sum(triplet_batches))
+                losses = []
+                triplet_batches = []
+                ap_distances = []
+                an_distances = []
+            if batch_idx >= max_batch:
+                break
+        except Exception as e:
+            logger.exception(e)
 
     total_loss /= (batch_idx + 1)
     return total_loss, metrics
@@ -171,16 +176,15 @@ def valid_epoch(val_loader, model, loss_fn, device, metrics, neptune_logger):
             embeddings = model(images)
             all_embeddings.extend(embeddings.cpu().numpy().tolist())
 
-            loss_outputs = loss_fn(embeddings, labels, videos_ids)
-            loss = loss_outputs[0] if type(loss_outputs) in (tuple, list) else loss_outputs
+            loss_ok, mean_loss, num_triplets, ap_distance, an_distance = loss_fn(embeddings, labels, videos_ids)
+            if not loss_ok:
+                continue
+            loss = mean_loss
             losses.append(loss.item())
             val_loss += loss.item()
             
-            num_triplets = loss_outputs[1]
             triplet_batches.append(num_triplets)
-            ap_distance = loss_outputs[2]
             ap_distances.append(ap_distance)
-            an_distance = loss_outputs[3]
             an_distances.append(an_distance)
             
             if (batch_idx % log_interval == 0) or (len(all_annotations) == len(val_loader.dataset)):
@@ -290,6 +294,11 @@ if __name__ == "__main__":
     parser.add_argument('--n_samples', type=int, required=False, default=99, help='number of samples per video per batch')
     parser.add_argument('--selector', type=str, required=False, default="HardestNegative", help='triplet selector to use')
     
+    parser.add_argument("-p", "--prtreid_path", type=str,required=False, default=None, 
+                        help="Path to the saved pickle of PRTReid model")
+    parser.add_argument("-pe", "--prtreid_embeddings", type=str, choices=['globl', 'foreg', 'conct', 'parts'], required=False, default='globl', 
+                        help="Type of embeddings output from PRTReid model")
+    
     parser.add_argument("--backbone", required=False, type=str, default="resnet18", help="Resnet arch to use as backbone")
     parser.add_argument("--out_features", required=False, type=int, default=512, help="MLP output features")
     parser.add_argument("--hidden", required=False, type=parse_int_list, default=[], help="MLP hidden layers as comma-separated list of integers")
@@ -314,12 +323,17 @@ if __name__ == "__main__":
     train_dataset_path = args["train"]
     test_dataset_path = args["test"]
     valid_dataset_path = args["valid"]
+    
     epochs = args["epochs"]
     batches = args["batches"]
     n_videos_batch = args["n_videos"]
     n_samples_per_video_batch = args["n_samples"]
+    
     out_features = args["out_features"]
     hidden_layers = args["hidden"]
+    prtreid_path = args["prtreid_path"]
+    prtreid_embeddings = args["prtreid_embeddings"]
+    
     selector_str = args["selector"]
     lr = args["learning_rate"]
     backbone = args["backbone"]
@@ -333,9 +347,6 @@ if __name__ == "__main__":
     neptune_logger.param("batches", batches)
     neptune_logger.param("n_videos_batch", n_videos_batch)
     neptune_logger.param("n_samples_per_class", n_samples_per_video_batch)
-    neptune_logger.param("features", out_features)
-    neptune_logger.param("backbone", backbone)
-    neptune_logger.param("hidden layers", str(hidden_layers))
     neptune_logger.param("selector", selector_str)
     neptune_logger.param("lr", lr)
     neptune_logger.tags(["TrainIdentifier"])
@@ -349,13 +360,33 @@ if __name__ == "__main__":
     kwargs = {'num_workers': 4, 'pin_memory': True} if device == "cuda" else {}
     
     # Load adequate model and transform for input
-    model = ResnetMLP(backbone, mlp_hidden_layers=hidden_layers, mlp_output_size=out_features).to(device)
-    transform = RESNET_TRANSFORM
+    if prtreid_path == None:
+        logger.info("Using Resnet + MLP model")
+        print("hidden", hidden_layers)
+        model = ResnetMLP(backbone, mlp_hidden_layers=hidden_layers, mlp_output_size=out_features).to(device)
+        transform = RESNET_TRANSFORM
+        print("hidden", hidden_layers)
         
-    total_params = sum(p.numel() for p in model.parameters())
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        model_parameters = model.parameters
+        
+        neptune_logger.param("features", out_features)
+        neptune_logger.param("backbone", backbone)
+        neptune_logger.param("hidden layers", str(hidden_layers))
+    else:
+        logger.info("Using PRTReid model")
+        model = torch.load(prtreid_path).to(device)
+        model.target_embeddings = prtreid_embeddings
+        transform = model.preprocess_pil_image
+        
+        model_parameters = model.feature_extractor.model.parameters
+        
+        neptune_logger.param("prtreid embeddings", prtreid_embeddings)
+        
+    total_params = sum(p.numel() for p in model_parameters())
+    trainable_params = sum(p.numel() for p in model_parameters() if p.requires_grad)
     neptune_logger.param("Total parameters", total_params)
     neptune_logger.param("Trainable parameters", trainable_params)
+    neptune_logger.param("model", model.__class__.__name__)
 
     logger.info("Creating train dataset and dataloader")
     train_dataset = SoccerNetGSDataset(train_dataset_path, transform=transform, videos_list=train_videos)
@@ -396,7 +427,7 @@ if __name__ == "__main__":
     
     loss_fn = OnlineTripletLoss(margin, selector_class(margin))
     
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
+    optimizer = torch.optim.Adam(model_parameters(), lr=lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 8, gamma=0.1, last_epoch=-1)
     n_epochs = epochs
     log_interval = 30
