@@ -37,6 +37,8 @@ def generate_heatmap(directory: str) -> None:
         for j in range(10):
             plt.text(j, i, str(data[i, j]), ha='center', va='center', color='white')
 
-    plt.show()
+    # Save the plot as an image file
+    plt.savefig('stats.png')
+    plt.close()
     
 generate_heatmap('dataset')

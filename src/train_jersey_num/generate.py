@@ -43,11 +43,6 @@ def process_dataset(input_dataset_path: str, output_dataset_path: str, model_pat
     # Load the SVHN detector
     svhn = SVHNNumberDet(model_path, threshold)
     
-    # Check if input dataset path exists
-    if not os.path.isdir(input_dataset_path):
-        print(f"Error: Input dataset path '{input_dataset_path}' does not exist.")
-        return
-    
     total_annotations = count_annotations(input_dataset_path)
     
     # Get list of folders containing 'SNGS' in their name
@@ -76,7 +71,7 @@ def process_dataset(input_dataset_path: str, output_dataset_path: str, model_pat
                 continue
 
             images = {img["image_id"]: img["file_name"] for img in data["images"]}
-            annotations = [ann for ann in data["annotations"] if "attributes" in ann and ann["attributes"]["role"] == 'player']
+            annotations = [ann for ann in data["annotations"] if "attributes" in ann and (ann["attributes"]["role"] == 'player' or ann["attributes"]["role"] == 'goalkeeper')]
             annotations.sort(key=lambda ann: int(ann["image_id"]), reverse=False)
 
             last_processed_frame = {}
@@ -122,13 +117,23 @@ def main():
     parser = argparse.ArgumentParser(description='Generate jersey number dataset')
     parser.add_argument('input_path', type=str, help='Input dataset path')
     parser.add_argument('model_path', type=str, help='Path to SVHN model')
-    parser.add_argument('--output_path', type=str, help='Output dataset path. (src/train_jersey_num/dataset)', default=os.path.join('src', 'train_jersey_num', 'dataset'))
+    parser.add_argument('--output_path', type=str, help='Output dataset path. (./dataset)', default='dataset')
     parser.add_argument('--threshold', type=float, help='Threshold for SVHN detection. (0.55)', default=0.55)
     parser.add_argument('--cooldown_frames', type=int, help='Cooldown frames for player detection. (5)', default=5)
     args = parser.parse_args()
 
+    # Check if input dataset path exists
+    if not os.path.exists(args.input_path):
+        print(f"Error: Input dataset path '{args.input_path}' does not exist.")
+        return
+
+    # Check if model path exists
+    if not os.path.exists(args.model_path):
+        print(f"Error: Model path '{args.model_path}' does not exist.")
+        return
+    
     # Process the dataset
-    process_dataset(args.input_path, args.output_path, args.model_path, args.threshold, args.cooldown_frames)
+    # process_dataset(args.input_path, args.output_path, args.model_path, args.threshold, args.cooldown_frames)
 
 if __name__ == "__main__":
     main()
