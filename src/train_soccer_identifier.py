@@ -17,7 +17,7 @@ from collections import defaultdict
 from gsr.utils.neptune_logger import NeptuneLogger
 
 from SNGS_dataset.dataset import SoccerNetGSDataset
-from SNGS_dataset.sampler import SoccerNetGSBatchSampler, convert_dict_to_list
+from SNGS_dataset.sampler import SoccerNetGSBatchSampler, SoccerNetEvenRoleIdBatchSampler, convert_dict_to_list
 from losses.triplet_loss import OnlineTripletLoss, TripletSelector, RandomNegativeTripletSelector, HardestNegativeTripletSelector, SemihardNegativeTripletSelector
 from losses.triplet_loss import distance as triplet_loss_distance
 
@@ -77,8 +77,11 @@ def fit(train_loader, val_loader, model, loss_fn, optimizer, scheduler, n_epochs
             folder_save_model_path = Path(experiment_folder, "models")
             folder_save_model_path.mkdir(parents=True, exist_ok=True)
             save_model_path = Path(folder_save_model_path, f"epoch_{epoch}.pt")
-            torch.save(model.state_dict(), save_model_path)
-
+            if type(model) == PRTReId:
+                torch.save(model, save_model_path)
+            else:
+                torch.save(model.state_dict(), save_model_path)
+            
             print(message)
         except Exception as e:
             logger.exception(e)
@@ -393,7 +396,8 @@ if __name__ == "__main__":
     # Add Test into Train
     # test_dataset = SoccerNetGSDataset(test_dataset_path, transform=transform, videos_list=None)
     # big_train_dataset = torch.utils.data.ConcatDataset([train_dataset, test_dataset])
-    train_batch_sampler = SoccerNetGSBatchSampler(train_dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_per_video_batch)
+    train_batch_sampler = SoccerNetEvenRoleIdBatchSampler(train_dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_per_video_batch)
+    neptune_logger.param("train_batch_sampler", train_batch_sampler.__class__.__name__)
     # train_dataset = big_train_dataset
     
     online_train_loader = torch.utils.data.DataLoader(train_dataset, batch_sampler=train_batch_sampler, **kwargs)
@@ -430,7 +434,7 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(model_parameters(), lr=lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 8, gamma=0.1, last_epoch=-1)
     n_epochs = epochs
-    log_interval = 30
+    log_interval = 1
     
     if batches is None:
         batches = math.inf

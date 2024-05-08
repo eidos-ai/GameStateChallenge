@@ -382,21 +382,22 @@ class ResNet(nn.Module):
 
         if self.fc is not None:
             v = self.fc(v) # torch.Size([1, 512])
+        
+        return v
+#         if not self.training:
+#             return v
 
-        if not self.training:
-            return v
+#         if self.classifier:
+#             y = self.classifier(v)
+#         else:
+#             y = None
 
-        if self.classifier:
-            y = self.classifier(v)
-        else:
-            y = None
-
-        if self.loss == 'softmax':
-            return y
-        elif self.loss == 'triplet':
-            return y, v
-        else:
-            raise KeyError("Unsupported loss: {}".format(self.loss))
+#         if self.loss == 'softmax':
+#             return y
+#         elif self.loss == 'triplet':
+#             return y, v
+#         else:
+#             raise KeyError("Unsupported loss: {}".format(self.loss))
 
 
 def init_pretrained_weights(model, model_url):
@@ -597,7 +598,7 @@ class ResnetMLP(nn.Module):
             self.model = resnext101_32x8d(fc_dims=fc_dims, **kwargs)
             
     def forward(self, x):
-        _, result = self.model(x)
+        result = self.model(x)
         return result
 
 

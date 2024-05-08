@@ -5,7 +5,99 @@ from tqdm import tqdm
 from operator import itemgetter
 from torch.utils.data import BatchSampler
 
+class SoccerNetEvenRoleIdBatchSampler(BatchSampler):
+    """
+    This batch sampler returns a balanced number of samples among roles_ids for a video.
+    When a role_id runs out of instances for a match, it starts again from start.
+    """
+    def __init__(
+        self, labels: list[dict[str:Any]], n_videos: int, n_samples: int
+    ) -> None:
+        self.labels = labels
+        self.n_videos = n_videos
+        self.n_samples = n_samples
+        self.batch_size = self.n_videos * self.n_samples
+        self.n_dataset = len(self.labels)
 
+        # { video_name: { roles_id: list[indices_of_crops_from_that_video_and_role] } }
+        self.labels_indices_from_videos = {}
+        for idx, label in enumerate(self.labels):
+            video = label["video"]
+            roles_id = label["role_id"]
+            if video not in self.labels_indices_from_videos:
+                self.labels_indices_from_videos[video] = {}
+            if roles_id not in self.labels_indices_from_videos[video]:
+                self.labels_indices_from_videos[video][roles_id] = []
+            self.labels_indices_from_videos[video][roles_id].append(idx)
+        
+        # Shuffle indices for each roles_id in each video
+        for video in self.labels_indices_from_videos:
+            for roles_id in self.labels_indices_from_videos[video]:
+                np.random.shuffle(self.labels_indices_from_videos[video][roles_id])
+
+        self.used_label_indices_count = {
+            video: {roles_id: 0 for roles_id in self.labels_indices_from_videos[video]}
+            for video in self.labels_indices_from_videos
+        }
+
+        self.count = 0   
+    
+    def __iter__(self) -> List[int]:
+        self.count = 0
+        while self.count < self.n_dataset:
+            remaining_samples = self.n_dataset - self.count
+            current_batch_size = min(self.batch_size, remaining_samples)
+
+            if remaining_samples < 2 * self.batch_size:
+                current_batch_size = remaining_samples
+                
+            indices = []
+            while len(indices) < current_batch_size:
+                videos = np.random.choice(list(self.labels_indices_from_videos.keys()), self.n_videos, replace=False)
+                
+                for video in videos:
+                    roles_in_video = len(self.labels_indices_from_videos[video])
+                    for roles_id in self.labels_indices_from_videos[video]:
+                        available_samples = len(self.labels_indices_from_videos[video][roles_id]) - self.used_label_indices_count[video][roles_id]
+                        samples_needed = min(self.n_samples // roles_in_video, available_samples)
+                        
+                        start_index = self.used_label_indices_count[video][roles_id]
+                        end_index = start_index + samples_needed
+                        indices.extend(self.labels_indices_from_videos[video][roles_id][start_index:end_index])
+
+                        # Wrap around if the end of the list is reached
+                        if end_index >= len(self.labels_indices_from_videos[video][roles_id]):
+                            end_index = end_index % len(self.labels_indices_from_videos[video][roles_id])
+                            indices.extend(self.labels_indices_from_videos[video][roles_id][:end_index])
+
+                        # Update count of used samples
+                        self.used_label_indices_count[video][roles_id] = end_index
+                    
+            self.count += len(indices)
+            
+            videos = np.unique([self.labels[i]['video'] for i in indices])
+            # for v in videos:
+            #     print("/////")
+            #     print(v)
+            #     vi = [i for i in indices if self.labels[i]['video'] == v]
+            #     roles_ids = np.unique([self.labels[i]['role_id'] for i in vi])
+            #     for r in roles_ids:
+            #         print("Role", r, len([i for i in vi if self.labels[i]["role_id"] == r]))                
+            yield indices
+        
+        # Once finished, reshuffle and reset count for every roles_id in every video
+        for video in self.labels_indices_from_videos:
+            for roles_id in self.labels_indices_from_videos[video]:
+                np.random.shuffle(self.labels_indices_from_videos[video][roles_id])
+                self.used_label_indices_count[video][roles_id] = 0
+            
+    def __len__(self) -> int:
+        size = 0
+        for video in self.labels_indices_from_videos:
+            for roles_id in self.labels_indices_from_videos[video]:
+                size += math.floor(len(self.labels_indices_from_videos[video][roles_id]) / self.batch_size)
+        return size
+    
 class SoccerNetGSBatchSampler(BatchSampler):
     """
     BatchSampler samples from n_videos and within them, samples n_samples.

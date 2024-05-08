@@ -14,6 +14,21 @@ from prtreid.utils.imagetools import build_gaussian_heatmaps
 import prtreid
 from prtreid.utils.tools import extract_test_embeddings
 
+def inspect(name, obj, depth=0):
+    indent = '|-' * depth
+    indent_next = '|--' * (depth + 1)
+    if isinstance(obj, dict):
+        print(f"{indent}{name}: {type(obj)}")
+        for k, v in obj.items():
+            print(f"{indent_next}{k}:")
+            inspect('', v, depth + 1)
+    elif isinstance(obj, np.ndarray) or isinstance(obj, torch.Tensor):
+        print(f"{indent}{name}: {obj.shape}")
+    else:
+        print(f"{indent}{name}: {type(obj)}")
+
+
+        
 class PRTReId(torch.nn.Module):
     def __init__(self, model_path: str, hrnet_dir: str, config_path: str,
                 device: str, target_embeddings="globl"):
@@ -58,6 +73,17 @@ class PRTReId(torch.nn.Module):
     def forward(self, model_input_tensor: torch.Tensor):
         model_output = self.feature_extractor.model(model_input_tensor, external_parts_masks=None)
         embeddings, visibility_scores, id_cls_scores, team_cls_score, role_cls_score, pixels_cls_scores, spatial_features, parts_masks = model_output
+        inspect("model", self.feature_extractor.model )
+        inspect("embeddings", embeddings)
+        inspect("visibility_scores", visibility_scores)
+        inspect("id_cls_scores", id_cls_scores)
+        inspect("team_cls_score", team_cls_score)
+        inspect("role_cls_score", role_cls_score)
+        inspect("pixels_cls_scores", pixels_cls_scores)
+        inspect("spatial_features", spatial_features)
+        inspect("parts_masks", parts_masks)
+        print(self.cfg)
+
         embeddings = embeddings[self.target_embeddings]
         if self.target_embeddings == "parts":
             embeddings = embeddings.squeeze(dim = 1)
