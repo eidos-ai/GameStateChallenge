@@ -35,7 +35,8 @@ def cluster_bboxes_on_video(model: ResnetMLP, data_path: str, bbox_path: str, ou
             model_output = dbscan.fit(video_embeddings)
             predictions = model_output.labels_
             for i in range(len(predictions)):
-                prediction_dir = os.path.join(output_path, video, str(predictions[i]))
+                temp_prediction = str(predictions[i]).zfill(3) if predictions[i] != -1 else str(predictions[i])
+                prediction_dir = os.path.join(output_path, video, temp_prediction)
                 os.makedirs(prediction_dir, exist_ok=True)
                 crop_path = os.path.join(frames_directory, crops[i])
                 try:
