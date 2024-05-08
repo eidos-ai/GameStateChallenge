@@ -73,17 +73,16 @@ class PRTReId(torch.nn.Module):
     def forward(self, model_input_tensor: torch.Tensor):
         model_output = self.feature_extractor.model(model_input_tensor, external_parts_masks=None)
         embeddings, visibility_scores, id_cls_scores, team_cls_score, role_cls_score, pixels_cls_scores, spatial_features, parts_masks = model_output
-        inspect("model", self.feature_extractor.model )
-        inspect("embeddings", embeddings)
-        inspect("visibility_scores", visibility_scores)
-        inspect("id_cls_scores", id_cls_scores)
-        inspect("team_cls_score", team_cls_score)
-        inspect("role_cls_score", role_cls_score)
-        inspect("pixels_cls_scores", pixels_cls_scores)
-        inspect("spatial_features", spatial_features)
-        inspect("parts_masks", parts_masks)
-        print(self.cfg)
-
+        # inspect("model", self.feature_extractor.model )
+        # inspect("embeddings", embeddings)
+        # inspect("visibility_scores", visibility_scores)
+        # inspect("id_cls_scores", id_cls_scores)
+        # inspect("team_cls_score", team_cls_score)
+        # inspect("role_cls_score", role_cls_score)
+        # inspect("pixels_cls_scores", pixels_cls_scores)
+        # inspect("spatial_features", spatial_features)
+        # inspect("parts_masks", parts_masks)
+        
         embeddings = embeddings[self.target_embeddings]
         if self.target_embeddings == "parts":
             embeddings = embeddings.squeeze(dim = 1)
