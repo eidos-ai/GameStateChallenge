@@ -34,7 +34,7 @@ def count_annotations(input_dataset_path: str) -> int:
             print(f"Error: JSON file '{json_path}' does not contain 'images' or 'annotations' key.")
             continue
 
-        annotations = [ann for ann in data["annotations"] if "attributes" in ann and ann["attributes"]["role"] == 'player']
+        annotations = [ann for ann in data["annotations"] if "attributes" in ann and (ann["attributes"]["role"] == 'player' or ann["attributes"]["role"] == 'goalkeeper')]
         total_annotations += len(annotations)
         
     return total_annotations
@@ -133,7 +133,7 @@ def main():
         return
     
     # Process the dataset
-    # process_dataset(args.input_path, args.output_path, args.model_path, args.threshold, args.cooldown_frames)
+    process_dataset(args.input_path, args.output_path, args.model_path, args.threshold, args.cooldown_frames)
 
 if __name__ == "__main__":
     main()

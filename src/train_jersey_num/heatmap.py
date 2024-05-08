@@ -1,8 +1,9 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import argparse
 
-def generate_heatmap(directory: str) -> None:
+def generate_heatmap(directory: str, name: str) -> None:
     def count_crops(directory):
         crop_counts = np.zeros((10, 10), dtype=int)
         total_crops = 0
@@ -38,7 +39,21 @@ def generate_heatmap(directory: str) -> None:
             plt.text(j, i, str(data[i, j]), ha='center', va='center', color='white')
 
     # Save the plot as an image file
-    plt.savefig('stats.png')
+    plt.savefig(name)
     plt.close()
     
-generate_heatmap('dataset')
+def main():
+    parser = argparse.ArgumentParser(description='Generate the jersey heatmap for a dataset')
+    parser.add_argument('dataset', type=str, help='Dataset path')
+    parser.add_argument('--name', type=str, help='Output file name (stats.png)', default='stats.png')
+    args = parser.parse_args()
+    
+    # Check if input dataset path exists
+    if not os.path.exists(args.dataset):
+        print(f"Error: Input dataset path '{args.dataset}' does not exist.")
+        return
+    
+    generate_heatmap(args.dataset, args.name)
+    
+if __name__ == "__main__":
+    main()
