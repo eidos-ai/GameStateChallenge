@@ -149,7 +149,7 @@ def process_dataset(
 
                 if detected:
                     # print('found one')
-                    jersey_number = str(annotation["attributes"].get("jersey", "None"))
+                    jersey_number = str(annotation["attributes"].get("jersey", "0"))
                     output_folder = os.path.join(output_dataset_path, jersey_number)
                     os.makedirs(output_folder, exist_ok=True)
                     output_file_path = os.path.join(

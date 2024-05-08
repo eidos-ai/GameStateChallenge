@@ -8,7 +8,7 @@ def generate_heatmap(directory: str, name: str) -> None:
     def count_crops(directory):
         crop_counts = np.zeros((10, 10), dtype=int)
         total_crops = 0
-        for i in range(1, 100):
+        for i in range(0, 100):
             folder_name = str(i)
             folder_path = os.path.join(directory, folder_name)
             # print(folder_path, os.path.exists(folder_path))
