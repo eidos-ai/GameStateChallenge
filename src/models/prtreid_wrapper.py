@@ -24,13 +24,47 @@ def inspect(name, obj, depth=0):
             inspect('', v, depth + 1)
     elif isinstance(obj, np.ndarray) or isinstance(obj, torch.Tensor):
         print(f"{indent}{name}: {obj.shape}")
+    elif isinstance(obj, tuple):
+        print(f"{indent}{name}: {type(obj)}")
+        for i, v in enumerate(obj):
+            print(f"{indent_next}{i}:")
+            inspect('', v, depth + 1)
     else:
         print(f"{indent}{name}: {type(obj)}")
 
+from torch import nn
+    
+class BNClassifier(nn.Module):
+    # Source: https://github.com/upgirlnana/Pytorch-Person-REID-Baseline-Bag-of-Tricks
+    def __init__(self, in_dim, class_num):
+        super(BNClassifier, self).__init__()
 
-        
+        self.in_dim = in_dim
+        self.class_num = class_num
+
+        self.bn = nn.BatchNorm1d(self.in_dim)
+        self.bn.bias.requires_grad_(False)  # BoF: this doesn't have a big impact on perf according to author on github
+        self.classifier = nn.Linear(self.in_dim, self.class_num, bias=False)
+
+        self._init_params()
+
+    def forward(self, x):
+        feature = self.bn(x)
+        cls_score = self.classifier(feature)
+        return feature, cls_score
+
+    def _init_params(self):
+        for m in self.modules():
+            if isinstance(m, nn.BatchNorm1d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.001)  # ResNet = 0.01, Bof and ISP-reid = 0.001
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+                    
 class PRTReId(torch.nn.Module):
-    def __init__(self, model_path: str, hrnet_dir: str, config_path: str,
+    def __init__(self, embedding_dim: int, model_path: str, hrnet_dir: str, config_path: str,
                 device: str, target_embeddings="globl"):
         """
         target_embeddings can be one of 'globl', 'foreg', 'conct', 'parts'
@@ -61,6 +95,7 @@ class PRTReId(torch.nn.Module):
                     model=None,
                     verbose=False,  # FIXME @Vladimir
                 )
+        self.global_team_head = BNClassifier(256, embedding_dim)
         
         self.preprocess = self.feature_extractor.preprocess
         
@@ -72,9 +107,9 @@ class PRTReId(torch.nn.Module):
     
     def forward(self, model_input_tensor: torch.Tensor):
         model_output = self.feature_extractor.model(model_input_tensor, external_parts_masks=None)
-        embeddings, visibility_scores, id_cls_scores, team_cls_score, role_cls_score, pixels_cls_scores, spatial_features, parts_masks = model_output
+        backbone_embeddings, visibility_scores, id_cls_scores, team_cls_score, role_cls_score, pixels_cls_scores, spatial_features, parts_masks = model_output
         # inspect("model", self.feature_extractor.model )
-        # inspect("embeddings", embeddings)
+        # inspect("backbone_embeddings", backbone_embeddings)
         # inspect("visibility_scores", visibility_scores)
         # inspect("id_cls_scores", id_cls_scores)
         # inspect("team_cls_score", team_cls_score)
@@ -83,10 +118,11 @@ class PRTReId(torch.nn.Module):
         # inspect("spatial_features", spatial_features)
         # inspect("parts_masks", parts_masks)
         
-        embeddings = embeddings[self.target_embeddings]
+        backbone_embeddings = backbone_embeddings[self.target_embeddings]
         if self.target_embeddings == "parts":
-            embeddings = embeddings.squeeze(dim = 1)
-        return embeddings
+            backbone_embeddings = backbone_embeddings.squeeze(dim = 1)
+        _, team_embeddings = self.global_team_head(backbone_embeddings)
+        return team_embeddings
     
     def preprocess_pil_image(self, pil_image: Image):
         image_array = np.array(pil_image)
@@ -121,7 +157,7 @@ if __name__ == "__main__":
     config_path = args["config"]
     hrnet_dir = args["hrnet_pretrained"]
     
-    prtreid = PRTReId(model_path, hrnet_dir, config_path, device, 'globl')
+    prtreid = PRTReId(6, model_path, hrnet_dir, config_path, device, 'globl')
 
     sample_batch_images = ["sample_crop.png", "sample_crop.png"]
     model_input_pils = [Image.open(img_path).convert("RGB") for img_path in sample_batch_images] 

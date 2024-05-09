@@ -115,8 +115,7 @@ def train_epoch(train_loader, model, loss_fn, optimizer, device, log_interval, m
 
             optimizer.zero_grad()
 
-            embeddings = model(images)
-            
+            embeddings = model(images)         
             loss_ok, mean_loss, num_triplets, ap_distance, an_distance = loss_fn(embeddings, labels, videos_ids)
             if not loss_ok:
                 continue
@@ -377,7 +376,12 @@ if __name__ == "__main__":
         neptune_logger.param("hidden layers", str(hidden_layers))
     else:
         logger.info("Using PRTReid model")
-        model = torch.load(prtreid_path).to(device)
+        model_path = "../models/prtreid-soccernet-baseline.pth.tar"
+        hrnet_dir = "../models/hr_net"
+        config_path = "../models/prtreid.yaml"
+        model = PRTReId(out_features, model_path, hrnet_dir, config_path, device, 'globl')
+        model = model.to(device)
+        
         model.target_embeddings = prtreid_embeddings
         transform = model.preprocess_pil_image
         
