@@ -381,6 +381,7 @@ if __name__ == "__main__":
         config_path = "../models/prtreid.yaml"
         model = PRTReId(out_features, model_path, hrnet_dir, config_path, device, 'globl')
         model = model.to(device)
+        neptune_logger.param("features", out_features)
         
         model.target_embeddings = prtreid_embeddings
         transform = model.preprocess_pil_image

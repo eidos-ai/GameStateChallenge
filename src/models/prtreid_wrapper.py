@@ -14,23 +14,29 @@ from prtreid.utils.imagetools import build_gaussian_heatmaps
 import prtreid
 from prtreid.utils.tools import extract_test_embeddings
 
-def inspect(name, obj, depth=0):
+def inn(obj, depth=0):
+    if depth == 0:
+        frame = inspect.currentframe().f_back
+        var_value = frame.f_locals.get(var_name)
+        var_name = var_value
+    else:
+        var_name = ''
     indent = '|-' * depth
     indent_next = '|--' * (depth + 1)
     if isinstance(obj, dict):
-        print(f"{indent}{name}: {type(obj)}")
+        print(f"{indent}{var_name}: {type(obj)}")
         for k, v in obj.items():
             print(f"{indent_next}{k}:")
-            inspect('', v, depth + 1)
-    elif isinstance(obj, np.ndarray) or isinstance(obj, torch.Tensor):
-        print(f"{indent}{name}: {obj.shape}")
+            inspect(v, depth + 1)
+    elif isinstance(obj, np.ndarray):
+        print(f"{indent}{var_name}: {obj.shape}")
     elif isinstance(obj, tuple):
-        print(f"{indent}{name}: {type(obj)}")
+        print(f"{indent}{var_name}: {type(obj)}")
         for i, v in enumerate(obj):
             print(f"{indent_next}{i}:")
-            inspect('', v, depth + 1)
+            inspect(v, depth + 1)
     else:
-        print(f"{indent}{name}: {type(obj)}")
+        print(f"{indent}{var_name}: {type(obj)}")
 
 from torch import nn
     
@@ -110,7 +116,7 @@ class PRTReId(torch.nn.Module):
         backbone_embeddings, visibility_scores, id_cls_scores, team_cls_score, role_cls_score, pixels_cls_scores, spatial_features, parts_masks = model_output
         # inspect("model", self.feature_extractor.model )
         # inspect("backbone_embeddings", backbone_embeddings)
-        # inspect("visibility_scores", visibility_scores)
+        # inspect(visibility_scores)
         # inspect("id_cls_scores", id_cls_scores)
         # inspect("team_cls_score", team_cls_score)
         # inspect("role_cls_score", role_cls_score)
