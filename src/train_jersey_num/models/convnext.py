@@ -25,7 +25,7 @@ class ConvNext(pl.LightningModule):
             num_classes=num_classes
         )
         
-        # get model specific transforms (normalization, resize)
+        # Get model specific transforms (normalization, resize)
         self.data_config = timm.data.resolve_model_data_config(self.model)
         self.inference_transform = timm.data.create_transform(**self.data_config, is_training=False)
         self.train_transform = timm.data.create_transform(**self.data_config, is_training=True)

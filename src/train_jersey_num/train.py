@@ -45,7 +45,6 @@ class JerseyNumTrainer(pl.LightningModule):
         # self.valid_loader = init torch DataLoader for val dataset
         self.setup_dummy_data()
         
-        
     def setup_dummy_data(self):
         self.train_transform = self.model.get_transform(is_training= True)
         self.train_dataset = CustomDataset(transform=self.train_transform)
@@ -86,7 +85,7 @@ def train():
         max_epochs=10, #TODO: Read epochs as argument on main script
         log_every_n_steps=10
     )
-    # Train the model
+    # Train the Trainer
     trainer.fit(in_trainer, in_trainer.train_loader, in_trainer.val_loader)
     
     
