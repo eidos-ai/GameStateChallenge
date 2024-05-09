@@ -28,7 +28,7 @@ class JerseyNumberDataset(Dataset):
                     if img_name.lower().endswith(".jpg"):
                         img_path = os.path.join(label_path, img_name)
                         # Append path and label to the data list
-                        self.data.append({"image_path": img_path, "label": label})
+                        self.data.append({"image_path": img_path, "label": int(label)})
 
     def __len__(self):
         return len(self.data)
@@ -48,7 +48,7 @@ class JerseyNumberDataset(Dataset):
         if self.transform:
             image = self.transform(image)
 
-        return label, image
+        return image, label
 
 
 def main():
