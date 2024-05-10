@@ -86,14 +86,16 @@ class GroundTruthReader:
                                                role_id=role_id,
                                                jersey=annotation["attributes"]["jersey"] if annotation["attributes"]["jersey"] else "",
                                                bbox={
-                                                   "x": annotation["bbox_image"]["x"],
-                                                   "y": annotation["bbox_image"]["y"],
-                                                   "w": annotation["bbox_image"]["w"],
-                                                   "h": annotation["bbox_image"]["h"],
-                                               }))
+                                                    "x": annotation["bbox_image"]["x"],
+                                                    "y": annotation["bbox_image"]["y"],
+                                                    "w": annotation["bbox_image"]["w"],
+                                                    "h": annotation["bbox_image"]["h"],
+                                                    "x_pitch": annotation["bbox_pitch"]["x_bottom_middle"] if annotation["bbox_pitch"] else None,
+                                                    "y_pitch": annotation["bbox_pitch"]["y_bottom_middle"] if annotation["bbox_pitch"] else None
+                                                }))
         return annotations
     
-    def get_annotations_from_video(self, video: str) -> list[dict[str, Any]]:
+    def get_annotations_from_video(self, video: str) -> list[Annotation]:
         video_annotations = []
         for annotation in self.annotations:
             if annotation.video == video:
