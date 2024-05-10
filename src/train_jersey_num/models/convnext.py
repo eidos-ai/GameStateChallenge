@@ -12,7 +12,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 
 class ConvNext(pl.LightningModule):
-    def __init__(self, model_name: str, num_classes: int, learning_rate=1e-3):
+    def __init__(self, model_name: str, num_classes: int, learning_rate):
         super().__init__()
         self.model_name = model_name
         self.learning_rate = learning_rate
