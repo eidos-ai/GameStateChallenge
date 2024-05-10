@@ -45,7 +45,7 @@ def get_magic_kmeans_role_id(embeddings_directory: str, videos_list: List[str]) 
 def get_kmeans_role_id(embeddings_directory: str, videos_list: List[str], number_of_clusters: int) -> Dict[str, Dict[str, int]]:
     kmeans_role_id = defaultdict(lambda: defaultdict(list))
     kmeans = KMeans(n_clusters=number_of_clusters, random_state=0)
-    for video in tqdm(videos_list, total=len(videos_list), desc="Videos iteration to get Magic Kmeans role_id"):
+    for video in tqdm(videos_list, total=len(videos_list), desc="Videos iteration to get Kmeans role_id"):
         annotation_ids, embeddings = load_embeddings(embeddings_directory, video)
         results = kmeans.fit(embeddings, video)
         predictions = results.labels_
