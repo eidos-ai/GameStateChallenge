@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import List, Dict
 from collections import defaultdict
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 
 @dataclass
@@ -45,7 +46,9 @@ class ClusterScenario:
 
 def get_tracks(videos_list: List[str], gt_reader: GroundTruthReader) -> Dict[str, List[Track]]:
     total_tracks = defaultdict(list)
-    for video in videos_list:
+    for video in tqdm(videos_list, total=len(videos_list), desc='Getting tracks'):
+        if video[:5] != "SNGS-":
+            continue
         video_tracks = []
         video_annotations = gt_reader.get_annotations_from_video(video)
         for annotation in video_annotations:
@@ -60,9 +63,6 @@ def get_tracks(videos_list: List[str], gt_reader: GroundTruthReader) -> Dict[str
                         x_pitch=float(round(annotation.bbox["x_pitch"], 4)) if annotation.bbox["x_pitch"] else None, # it is possible for this value to be None
                         y_pitch=float(round(annotation.bbox["y_pitch"], 4)) if annotation.bbox["y_pitch"] else None  # it is possible for this value to be None
                        )
-            # if bbox.x_pitch is None or bbox.y_pitch is None:
-            #     print(annotation)
-
             for track in video_tracks:
                 if track.track_id == annotation.track_id:
                     track.bboxes.append(bbox)
@@ -77,7 +77,9 @@ class ClusterClassificationDataset(Dataset):
         self.gt_reader = GroundTruthReader(self.data_path, self.videos_list)
         self.tracks = get_tracks(self.videos_list, self.gt_reader)
         self.cluster_scenarios = []
-        for video in self.videos_list:
+        for video in tqdm(self.videos_list, total=len(self.videos_list), desc='Initializing ClusterClassificationDataset'):
+            if video[:5] != "SNGS-":
+                continue
             role_id_in_video = set()
             for track in self.tracks[video]:
                 role_id_in_video.add(track.role_id)

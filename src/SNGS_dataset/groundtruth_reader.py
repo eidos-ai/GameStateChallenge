@@ -3,6 +3,7 @@ import json
 from typing import Any, Optional
 from dataclasses import dataclass, field, asdict
 import pandas as pd
+from tqdm import tqdm
 
 
 LABELS_MAP = {
@@ -61,7 +62,7 @@ class GroundTruthReader:
 
     def get_annotations(self) -> list[Annotation]:
         annotations = []
-        for video in os.listdir(self.dataset_path):
+        for video in tqdm(os.listdir(self.dataset_path), total=len(os.listdir(self.dataset_path)), desc='Getting annotations'):
             if self.videos_list and video not in self.videos_list:
                 continue
             video_path = os.path.join(self.dataset_path, video)
