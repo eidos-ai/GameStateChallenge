@@ -60,6 +60,9 @@ def get_tracks(videos_list: List[str], gt_reader: GroundTruthReader) -> Dict[str
                         x_pitch=float(round(annotation.bbox["x_pitch"], 4)) if annotation.bbox["x_pitch"] else None, # it is possible for this value to be None
                         y_pitch=float(round(annotation.bbox["y_pitch"], 4)) if annotation.bbox["y_pitch"] else None  # it is possible for this value to be None
                        )
+            # if bbox.x_pitch is None or bbox.y_pitch is None:
+            #     print(annotation)
+
             for track in video_tracks:
                 if track.track_id == annotation.track_id:
                     track.bboxes.append(bbox)
