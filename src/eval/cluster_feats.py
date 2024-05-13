@@ -19,6 +19,9 @@ class Feats:
     def __repr__(self):
         return self.__str__()
 
+    def to_vector(self):
+        return np.array(astuple(self))
+
 
 class ClusterFeats():
     def forward(self, cluster_scenario: ClusterScenario) -> Feats:
@@ -108,9 +111,6 @@ class ClusterFeats():
                     )
         return feats
 
-    def feats_to_vector(self, feats: Feats) -> np.array:
-        return np.array(astuple(feats))
-
 
 if __name__ == "__main__":
     from cluster_classification_dataset import ClusterClassificationDataset
@@ -118,11 +118,16 @@ if __name__ == "__main__":
     data_path = "../../data/SoccerNetGS/valid"
     videos_list = ["SNGS-021", "SNGS-039", "SNGS-078"]
 
-    cluster_feats = ClusterFeats()
     dataset = ClusterClassificationDataset(data_path, videos_list)
+    cluster_feats = ClusterFeats()
 
-    total_feats = []
-    for i in range(len(dataset)):
-        feats = cluster_feats.forward(dataset[i])
-        arr = cluster_feats.feats_to_vector(feats)
-        print(arr)
+    X = []
+    y = []
+    for data, label in dataset:
+        feats = cluster_feats.forward(data)
+        arr = feats.to_vector()
+        X.append(arr)
+        y.append(label)
+    X = np.array(X)
+    y = np.array(y)
+    print(X, y)

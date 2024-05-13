@@ -96,7 +96,7 @@ class ClusterClassificationDataset(Dataset):
         return len(self.cluster_scenarios)
 
     def __getitem__(self, idx: int) -> ClusterScenario:
-        return self.cluster_scenarios[idx]
+        return self.cluster_scenarios[idx], self.cluster_scenarios[idx].this_tracks_role_id
 
 
 if __name__ == "__main__":
