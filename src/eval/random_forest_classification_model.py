@@ -13,8 +13,16 @@ def run_random_forest(X: np.array, y: np.array) -> None:
 
     y_pred = rf.predict(X_test)
 
+    cm = confusion_matrix(y_test, y_pred)
+    ConfusionMatrixDisplay(confusion_matrix=cm).plot();
+
     accuracy = round(accuracy_score(y_test, y_pred), 4)
+    precision = round(precision_score(y_test, y_pred, average='weighted'), 4)
+    recall = round(recall_score(y_test, y_pred, average='weighted'), 4)
+
     print("Accuracy:", accuracy)
+    print("Precision:", precision)
+    print("Recall:", recall)
 
 
 if __name__ == "__main__":
@@ -28,7 +36,7 @@ if __name__ == "__main__":
         "--data_path",
         type=str,
         required=False,
-        default="../../data/SoccerNetGS/challenge",
+        default="../../data/SoccerNetGS/valid",
         help="Path to the data (train, valid, test or challenge).",
     )
     parser.add_argument(
