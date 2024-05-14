@@ -5,6 +5,7 @@
 - [clustering_accuracy_evaluation.py](#clustering_accuracy_evaluationpy)
 - [dbscan_clustering.py](#dbscan_clusteringpy)
 - [dbscan_evaluation.py](#dbscan_evaluationpy)
+- [Others](#Others)
 
 ## model_run.py
 This script is used to run the model inference on the data and generate one .npz file per given video, containing:
@@ -62,3 +63,8 @@ The script takes the following **required** arguments:
 
 An example of a command to run the script is:
 ```python dbscan_evaluation.py --data_path ../../data/SoccerNetGS/train --videos_list SNGS-060 SNGS-061 SNGS-062```
+
+## Others
+- **bbox_detection.py**: used to detect (YOLOv8) bboxes from frames of the **challenge** set.
+- **bbox_clustering.py**: used to cluster (DBScan) bboxes of the **challenge** set, previously detected and saved into an output folder by the bbox_detection.py.
+- **plot_clustering.py**: after clustering with bbox_clustering.py, some clusters are too wide and have low homogeneity, so its bboxes are re-clustered (DBScan), with more restrictive hyperparameters.

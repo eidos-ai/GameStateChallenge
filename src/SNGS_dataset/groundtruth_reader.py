@@ -4,6 +4,7 @@ from typing import Any, Optional
 import logging
 from dataclasses import dataclass, field, asdict
 import pandas as pd
+from tqdm import tqdm
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ class GroundTruthReader:
 
     def get_annotations(self) -> list[Annotation]:
         annotations = []
-        for video in os.listdir(self.dataset_path):
+        for video in tqdm(os.listdir(self.dataset_path), total=len(os.listdir(self.dataset_path)), desc='Getting annotations'):
             if self.videos_list and video not in self.videos_list:
                 continue
             video_path = os.path.join(self.dataset_path, video)
@@ -92,14 +93,16 @@ class GroundTruthReader:
                                                role_id=role_id,
                                                jersey=annotation["attributes"]["jersey"] if annotation["attributes"]["jersey"] else "",
                                                bbox={
-                                                   "x": annotation["bbox_image"]["x"],
-                                                   "y": annotation["bbox_image"]["y"],
-                                                   "w": annotation["bbox_image"]["w"],
-                                                   "h": annotation["bbox_image"]["h"],
-                                               }))
+                                                    "x": annotation["bbox_image"]["x"],
+                                                    "y": annotation["bbox_image"]["y"],
+                                                    "w": annotation["bbox_image"]["w"],
+                                                    "h": annotation["bbox_image"]["h"],
+                                                    "x_pitch": annotation["bbox_pitch"]["x_bottom_middle"] if annotation["bbox_pitch"] else None,
+                                                    "y_pitch": annotation["bbox_pitch"]["y_bottom_middle"] if annotation["bbox_pitch"] else None
+                                                }))
         return annotations
     
-    def get_annotations_from_video(self, video: str) -> list[dict[str, Any]]:
+    def get_annotations_from_video(self, video: str) -> list[Annotation]:
         video_annotations = []
         for annotation in self.annotations:
             if annotation.video == video:
