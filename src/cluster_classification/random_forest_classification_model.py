@@ -5,20 +5,20 @@ from sklearn.model_selection import RandomizedSearchCV, train_test_split
 from scipy.stats import randint
 
 
-def run_random_forest(X: np.array, y: np.array) -> None:
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+def run_random_forest(X_train: np.array, y_train: np.array, X_valid: np.array, y_valid: np.array) -> None:
+    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
     rf = RandomForestClassifier()
     rf.fit(X_train, y_train)
 
-    y_pred = rf.predict(X_test)
+    y_pred = rf.predict(X_valid)
 
-    cm = confusion_matrix(y_test, y_pred)
+    cm = confusion_matrix(y_valid, y_pred)
     ConfusionMatrixDisplay(confusion_matrix=cm).plot();
 
-    accuracy = round(accuracy_score(y_test, y_pred), 4)
-    precision = round(precision_score(y_test, y_pred, average='weighted'), 4)
-    recall = round(recall_score(y_test, y_pred, average='weighted'), 4)
+    accuracy = round(accuracy_score(y_valid, y_pred), 4)
+    precision = round(precision_score(y_valid, y_pred, average='weighted'), 4)
+    recall = round(recall_score(y_valid, y_pred, average='weighted'), 4)
 
     print("Accuracy:", accuracy)
     print("Precision:", precision)
@@ -33,36 +33,64 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Random forest classification model.")
     parser.add_argument(
-        "--data_path",
+        "--train_data_path",
         type=str,
         required=False,
-        default="../../data/SoccerNetGS/valid",
-        help="Path to the data (train, valid, test or challenge).",
+        default="../../data/SoccerNetGS/train",
+        help="Path to the train set.",
     )
     parser.add_argument(
-        "--videos_list",
+        "--train_videos_list",
         type=str,
         required=False,
         nargs="+",
         default=None,
-        help="List of videos to use.",
+        help="List of videos to train.",
+    )
+    parser.add_argument(
+        "--valid_data_path",
+        type=str,
+        required=False,
+        default="../../data/SoccerNetGS/valid",
+        help="Path to the valid set.",
+    )
+    parser.add_argument(
+        "--valid_videos_list",
+        type=str,
+        required=False,
+        nargs="+",
+        default=None,
+        help="List of videos for validation.",
     )
 
     args = vars(parser.parse_args())
-    data_path = args["data_path"]
-    videos_list = args["videos_list"]
+    train_data_path = args["train_data_path"]
+    train_videos_list = args["train_videos_list"]
+    valid_data_path = args["valid_data_path"]
+    valid_videos_list = args["valid_videos_list"]
 
-    dataset = ClusterClassificationDataset(data_path, videos_list)
+    train_dataset = ClusterClassificationDataset(train_data_path, train_videos_list)
+    valid_dataset = ClusterClassificationDataset(valid_data_path, valid_videos_list)
     cluster_feats = ClusterFeats()
 
-    X = []
-    y = []
-    for data, label in tqdm(dataset, total=len(dataset), desc='Iterating over dataset'):
+    X_train = []
+    y_train = []
+    for data, label in tqdm(train_dataset, total=len(train_dataset), desc='Iterating over train dataset'):
         feats = cluster_feats.forward(data)
         arr = feats.to_vector()
-        X.append(arr)
-        y.append(label)
-    X = np.array(X)
-    y = np.array(y)
+        X_train.append(arr)
+        y_train.append(label)
+    X_train = np.array(X_train)
+    y_train = np.array(y_train)
+    
+    X_valid = []
+    y_valid = []
+    for data, label in tqdm(valid_dataset, total=len(valid_dataset), desc='Iterating over valid dataset'):
+        feats = cluster_feats.forward(data)
+        arr = feats.to_vector()
+        X_valid.append(arr)
+        y_valid.append(label)
+    X_valid = np.array(X_valid)
+    y_valid = np.array(y_valid)
 
-    run_random_forest(X,y)
+    run_random_forest(X_train, y_train, X_valid, y_valid)

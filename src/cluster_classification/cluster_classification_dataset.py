@@ -71,7 +71,7 @@ def get_tracks(videos_list: List[str], gt_reader: GroundTruthReader) -> Dict[str
 
 
 class ClusterClassificationDataset(Dataset):
-    def __init__(self, data_path: str, videos_list: List[str]) -> None:
+    def __init__(self, data_path: str, videos_list: List[str]=None) -> None:
         self.data_path = data_path
         self.videos_list = videos_list if videos_list else os.listdir(data_path)
         self.gt_reader = GroundTruthReader(self.data_path, self.videos_list)
