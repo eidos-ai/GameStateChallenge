@@ -1,4 +1,5 @@
 import os
+import random
 import sys
 parent_dir = os.path.dirname(os.path.dirname(__file__))
 sys.path.append(parent_dir)
@@ -38,8 +39,9 @@ class ClusterScenario:
     this_tracks_role_id: int
     this_tracks: List[Track]
     rest_tracks: List[Track]
+    is_valid: bool
     def __str__(self):
-        return f'ClusterScenario(this_tracks_role_id={self.this_tracks_role_id}, this_tracks=(lenght: {len(self.this_tracks)}), rest_tracks=(lenght: {len(self.rest_tracks)}))'
+        return f'ClusterScenario(this_tracks_role_id={self.this_tracks_role_id}, this_tracks=(lenght: {len(self.this_tracks)}), rest_tracks=(lenght: {len(self.rest_tracks)}), is_valid={self.is_valid})'
     def __repr__(self):
         return self.__str__()
 
@@ -71,27 +73,81 @@ def get_tracks(videos_list: List[str], gt_reader: GroundTruthReader) -> Dict[str
 
 
 class ClusterClassificationDataset(Dataset):
-    def __init__(self, data_path: str, videos_list: List[str]=None) -> None:
+    def __init__(self, data_path: str, videos_list: List[str]=None, 
+                 homogeneity_threshold: float=0.9, scenarios_per_video: int=100) -> None:
+
         self.data_path = data_path
         self.videos_list = videos_list if videos_list else os.listdir(data_path)
+        self.homogeneity_threshold = homogeneity_threshold
+
+        # calculate the amount of valid and invalid scenarios per video, given "scenarios_per_video"
+        self.amount_of_valid_scenarios = scenarios_per_video // 2
+        self.amount_of_invalid_scenarios = scenarios_per_video - self.amount_of_valid_scenarios
+
+        # instantiate GroundTruthReader and get all tracks
         self.gt_reader = GroundTruthReader(self.data_path, self.videos_list)
         self.tracks = get_tracks(self.videos_list, self.gt_reader)
         self.cluster_scenarios = []
+
         for video in tqdm(self.videos_list, total=len(self.videos_list), desc='Initializing ClusterClassificationDataset'):
+            # filter non-videos directories
             if video[:5] != "SNGS-":
                 continue
+
+            # get every role_id present in the video
             role_id_in_video = set()
             for track in self.tracks[video]:
                 role_id_in_video.add(track.role_id)
-            for role_id in role_id_in_video:
-                this_tracks = []
-                rest_tracks = []
+
+            # create valid ClusterScenarios
+            for valid_scenario in tqdm(range(self.amount_of_valid_scenarios), total=self.amount_of_valid_scenarios, desc='Generating valid scenarios'):
+                # randomly choose a role_id and get the tracks that have it as role_id, and the ones that do not
+                random_role = random.choice(list(role_id_in_video))
+                random_role_tracks = [track for track in self.tracks[video] if track.role_id == random_role]
+                other_role_tracks = [track for track in self.tracks[video] if track.role_id != random_role]
+
+                # within this_tracks, calculate the amount of tracks that will be from the ramdom role
+                num_this_tracks_from_random_role = round(len(random_role_tracks) * self.homogeneity_threshold)
+                num_this_tracks_from_other_role = len(random_role_tracks) - num_this_tracks_from_random_role
+                
+                # randomly choose the tracks that will be from the random role and the ones from other roles
+                this_tracks_from_random_role = random.sample(random_role_tracks, num_this_tracks_from_random_role)
+                this_tracks_from_other_role = random.sample(other_role_tracks, num_this_tracks_from_other_role)
+
+                # concatenate the tracks that will be in this_tracks
+                this_tracks = this_tracks_from_random_role + this_tracks_from_other_role
+
+                # the rest of the tracks will be in rest_tracks
+                rest_tracks = [track for track in self.tracks[video] if track not in this_tracks]
+
+                # check if the split was done correctly
+                assert (this_tracks + rest_tracks).sort == self.tracks[video].sort, f"Error after splitting tracks: this_tracks + rest_tracks != tracks[video]"
+
+                # create the ClusterScenario and append it to the list
+                cluster_scenario = ClusterScenario(this_tracks_role_id=random_role, this_tracks=this_tracks, rest_tracks=rest_tracks, is_valid=True)
+                self.cluster_scenarios.append(cluster_scenario)
+
+            for invalid_scenario in tqdm(range(self.amount_of_invalid_scenarios), total=self.amount_of_invalid_scenarios, desc='Generating invalid scenarios'):
+                # randomly choose a role_id and get the tracks that have it as role_id
+                random_role = random.choice(list(role_id_in_video))
+                random_role_tracks = [track for track in self.tracks[video] if track.role_id == random_role]
+
+                # get the tracks of other role_id, splitted by role_id
+                other_role_tracks = defaultdict(list)
                 for track in self.tracks[video]:
-                    if track.role_id == role_id:
-                        this_tracks.append(track)
-                    else:
-                        rest_tracks.append(track)
-                cluster_scenario = ClusterScenario(this_tracks_role_id=role_id, this_tracks=this_tracks, rest_tracks=rest_tracks)
+                    if track.role_id != random_role:
+                        other_role_tracks[track.role_id].append(track)
+
+                # make random choice to form this_tracks
+
+                # the rest of the tracks will be in rest_tracks
+                rest_tracks = [track for track in self.tracks[video] if track not in this_tracks]
+
+                # check if the split was done correctly
+                assert (this_tracks + rest_tracks).sort == self.tracks[video].sort, f"Error after splitting tracks: this_tracks + rest_tracks != tracks[video]"
+
+                # create the ClusterScenario and append it to the list
+                cluster_scenario = ClusterScenario(this_tracks_role_id=random_role, this_tracks=this_tracks, rest_tracks=rest_tracks, is_valid=False)
                 self.cluster_scenarios.append(cluster_scenario)
 
     def __len__(self) -> int:
@@ -104,7 +160,12 @@ class ClusterClassificationDataset(Dataset):
 if __name__ == "__main__":
     data_path = "../../data/SoccerNetGS/valid"
     videos_list = ["SNGS-021", "SNGS-039", "SNGS-078"]
-    dataset = ClusterClassificationDataset(data_path, videos_list)
+    homogeneity_threshold = 0.9
+    scenarios_per_video = 100
+
+    dataset = ClusterClassificationDataset(data_path, videos_list, homogeneity_threshold, scenarios_per_video)
 
     for i in range(len(dataset)):
-        print(dataset[i])
+        scenario, role_id = dataset[i]
+        print(scenario)
+        print(role_id)
