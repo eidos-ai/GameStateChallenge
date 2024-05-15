@@ -32,5 +32,5 @@ This dataset inherits from Torch Dataset and returns ClusterScenario instances.
 The class takes the following arguments:
 - `data_path` (str): path to the train, test or valid data directory.
 - `videos_list` (list[str], default=None): if None, every video from **data_path** is included.
-- `homogeneity_threshold` (float): percentage of Track instances from `ClusterScenario.this_tracks` in which `ClusterScenario.this_tracks_role_id == Track.role_id`, to have `ClusterScenario.is_valid == True`.
+- `homogeneity_threshold` (float): proportion (between 0 and 1) of Track instances from `ClusterScenario.this_tracks` in which `ClusterScenario.this_tracks_role_id == Track.role_id`, to have `ClusterScenario.is_valid == True`.
 - `scenarios_per_video` (int): number of valid plus invalid ClusterScenario instances created from each video (currently balanced).
