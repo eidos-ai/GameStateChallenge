@@ -160,11 +160,11 @@ class DatasetRegistry():
         return train_datasets
     
     def get_valid_dataset(self):
-        valid_datasets = ConcatDataset([self.registry[dataset] for dataset in self.conf.valid_datasets])
+        valid_datasets = [(self.registry[dataset], dataset) for dataset in self.conf.valid_datasets]
         return valid_datasets        
 
 class JerseyNumTrainer(pl.LightningModule):
-    def __init__(self, data_conf: DatasetConfiguration,  model_name, experiments_folder, batch_size = 32, learning_rate = 1e-4):       
+    def __init__(self, data_conf: DatasetConfiguration,  model_name, experiments_folder, model_path = None, batch_size = 32, learning_rate = 1e-4):       
         super().__init__()
         self.save_hyperparameters()
         self.batch_size = batch_size
@@ -173,6 +173,10 @@ class JerseyNumTrainer(pl.LightningModule):
         # First create model
         self.model = ConvNext(model_name, 100, learning_rate)
         
+        # Load model if path given
+        if model_path is not None:
+            self.model.load_model(model_path)
+            
         self.train_transform = self.model.get_transform(is_training= True)        
         self.inference_transform = self.model.get_transform(is_training= False)
         self.data_registry = DatasetRegistry(data_conf, self.train_transform, self.inference_transform)
@@ -182,7 +186,9 @@ class JerseyNumTrainer(pl.LightningModule):
         self.val_dataset = self.data_registry.get_valid_dataset() 
 
         self.train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle = True)
-        self.val_loader = DataLoader(self.val_dataset, batch_size=self.batch_size,  shuffle = True)        
+        # self.val_loader = DataLoader(self.val_dataset, batch_size=self.batch_size,  shuffle = True)        
+        self.val_loaders = [DataLoader(d, batch_size=self.batch_size,  shuffle = True) for d, name in self.val_dataset]
+        self.val_loaders_names = [name for d, name in self.val_dataset]
         
         self.experiment_id = None
         self.root_experiments_folder = experiments_folder
@@ -191,7 +197,7 @@ class JerseyNumTrainer(pl.LightningModule):
         return self.experiment_id
 
         
-    def on_train_start(self):
+    def setup(self, stage):
         # Define experiment id
         if self.logger is not None and isinstance(self.logger, NeptuneLogger):
             # If using neptune, id is that of neptune experiment
@@ -227,15 +233,17 @@ class JerseyNumTrainer(pl.LightningModule):
         
         return loss
     
-    def validation_step(self, batch, batch_idx):        
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+        # Metrics are logged to current dataloader
+        dataset_name = self.val_loaders_names[dataloader_idx]
         _, gt_batch = batch
         pred_y_batch, loss = self._common_step(batch, batch_idx)
-        self.log('val_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log(f'val_loss/{dataset_name}', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, add_dataloader_idx = False)
         
         pred_labels = self.model.pred_to_label(pred_y_batch)
         
         accuracy = torch.sum(pred_labels == gt_batch) / float(gt_batch.size(0))
-        self.log('val_accuracy', accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log(f'val_accuracy/{dataset_name}', accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True, add_dataloader_idx = False)
         
         return loss
     
@@ -245,13 +253,13 @@ class JerseyNumTrainer(pl.LightningModule):
         model_path = Path(models_folder, f'model_epoch_{self.current_epoch}.pt')
         torch.save(self.model.state_dict(), str(model_path))
         
-    def on_validation_step_end(self):
+    def on_validation_epoch_end(self):
         self.save_model()
         
     def configure_optimizers(self):
         return self.model.configure_optimizers()
     
-def train(train_datasetpath, valid_datasetpath, test_datasetpath, svhn_datasetpath, train_datasets, valid_datasets, epochs, batch_size, model_name = "convnextv2_nano.fcmae_ft_in1k"):    
+def train(train_datasetpath, valid_datasetpath, test_datasetpath, svhn_datasetpath, train_datasets, valid_datasets, epochs, batch_size, model_path, model_name = "convnextv2_nano.fcmae_ft_in1k"):    
 
     data_configuration = DatasetConfiguration(        
         jerseynum_train_path = train_datasetpath,
@@ -262,7 +270,7 @@ def train(train_datasetpath, valid_datasetpath, test_datasetpath, svhn_datasetpa
         valid_datasets = valid_datasets        
     )
     experiments_folder = "../../experiments/jersey_num"
-    in_trainer = JerseyNumTrainer(data_configuration, experiments_folder=experiments_folder, batch_size=batch_size, model_name=model_name)
+    in_trainer = JerseyNumTrainer(data_configuration, experiments_folder=experiments_folder, batch_size=batch_size, model_name=model_name, model_path = model_path)
     
     
     neptune_logger = NeptuneLogger(  # replace with your own
@@ -279,7 +287,7 @@ def train(train_datasetpath, valid_datasetpath, test_datasetpath, svhn_datasetpa
     
     # Train the Trainer
     trainer.fit(
-        in_trainer, in_trainer.train_loader, in_trainer.val_loader)
+        in_trainer, in_trainer.train_loader, in_trainer.val_loaders)
     
     
 if __name__ == "__main__":
@@ -296,6 +304,7 @@ if __name__ == "__main__":
     parser.add_argument('-ep', '--epochs', type=int, default=10, required=False, help='Number of epochs for training')
     parser.add_argument('-tb', '--batch_size', type=int, default=32, required=False, help='Batch size')
     parser.add_argument('-m', '--model_name', type=str, default="convnextv2_nano.fcmae_ft_in1k", required=False, help='ConNext Model to use')
+    parser.add_argument('-p', '--model_path', type=str, required=False, help='Path to a pretrained model to start from')
     args = vars(parser.parse_args())
 
     if not os.path.exists(args['train']):
@@ -312,4 +321,5 @@ if __name__ == "__main__":
           args['train_datasets'], args['valid_datasets'],
           epochs = args['epochs'], 
           batch_size = args['batch_size'],
-          model_name = args['model_name'])
+          model_name = args['model_name'],
+          model_path = args['model_path'])
