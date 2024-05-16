@@ -11,6 +11,10 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 
+class SkipIteration(Exception):
+    pass
+
+
 @dataclass
 class BBox:
     frame: int
@@ -96,7 +100,7 @@ class ClusterClassificationDataset(Dataset):
             role_id_in_video = {track.role_id for track in self.tracks[video]}
 
             # create valid ClusterScenarios
-            for valid_scenario in tqdm(range(amount_of_valid_scenarios), total=amount_of_valid_scenarios, desc='Generating valid scenarios'):
+            for valid_scenario in tqdm(range(amount_of_valid_scenarios), total=amount_of_valid_scenarios, desc=f'Valid scenarios of video {video}'):
                 # randomly choose a role_id and get the tracks that have it as role_id, and the ones that do not
                 random_role = random.choice(list(role_id_in_video))
                 random_role_tracks = [track for track in self.tracks[video] if track.role_id == random_role]
@@ -121,85 +125,104 @@ class ClusterClassificationDataset(Dataset):
                 cluster_scenario = ClusterScenario(this_tracks_role_id=random_role, this_tracks=this_tracks, rest_tracks=rest_tracks, is_valid=True)
                 self.cluster_scenarios.append(cluster_scenario)
 
-            for invalid_scenario in tqdm(range(amount_of_invalid_scenarios), total=amount_of_invalid_scenarios, desc='Generating invalid scenarios'):
+            for invalid_scenario in tqdm(range(amount_of_invalid_scenarios), total=amount_of_invalid_scenarios, desc=f'Invalid scenarios of video {video}'):
                 # randomly choose a role_id and get the tracks that have it as role_id, and the ones that do not
-                random_role = random.choice(list(role_id_in_video))
-                random_role_tracks = [track for track in self.tracks[video] if track.role_id == random_role]
-                other_role_tracks = [track for track in self.tracks[video] if track.role_id != random_role]
+                try:
+                    random_role = random.choice(list(role_id_in_video))
+                    random_role_tracks = [track for track in self.tracks[video] if track.role_id == random_role]
+                    other_role_tracks = [track for track in self.tracks[video] if track.role_id != random_role]
 
-                # make random choice to form this_tracks
-                decision = random.choice([1, 2, 3])
+                    # make random choice to form this_tracks
+                    decision = random.choice([1, 2, 3])
 
-                # DECISION: Tomar 50% de tracks de ese role_id + Tomar 50% de tracks de otro role_id
-                if decision == 1:
-                    # get 50% of tracks from random_role
-                    num_this_tracks_from_random_role = round(len(random_role_tracks) // 2)                    
-                    this_tracks = random.sample(random_role_tracks, num_this_tracks_from_random_role)
+                    # DECISION: Tomar 50% de tracks de ese role_id + Tomar 50% de tracks de otro role_id
+                    if decision == 1:
+                        # get 50% of tracks from random_role
+                        num_this_tracks_from_random_role = round(len(random_role_tracks) // 2)                    
+                        this_tracks = random.sample(random_role_tracks, num_this_tracks_from_random_role)
 
-                    # get 50% of tracks from other_random_role
-                    min_num_this_tracks_from_other_random_role = round(num_this_tracks_from_random_role * 0.7)
-                    max_num_this_tracks_from_other_random_role = round(num_this_tracks_from_random_role * 1.3)
-                    other_random_role = random.choice(list(role_id_in_video))
-                    while (other_random_role == random_role or 
-                           len([track for track in self.tracks[video] if track.role_id == other_random_role]) < min_num_this_tracks_from_other_random_role):
+                        # get 50% of tracks from other_random_role
+                        min_num_this_tracks_from_other_random_role = round(num_this_tracks_from_random_role * 0.7)
+                        max_num_this_tracks_from_other_random_role = round(num_this_tracks_from_random_role * 1.3)
                         other_random_role = random.choice(list(role_id_in_video))
-                    other_random_role_tracks = [track for track in self.tracks[video] if track.role_id == other_random_role]
 
-                    if len(other_random_role_tracks) < max_num_this_tracks_from_other_random_role:
-                        this_tracks.extend(other_random_role_tracks)
-                    else:
-                        this_tracks.extend(random.sample(other_random_role_tracks, min_num_this_tracks_from_other_random_role))
+                        counter = 0
+                        while (other_random_role == random_role or 
+                            len([track for track in self.tracks[video] if track.role_id == other_random_role]) < min_num_this_tracks_from_other_random_role):
+                            other_random_role = random.choice(list(role_id_in_video))
+                            counter += 1
+                            if counter == 10:
+                                raise SkipIteration
+                        other_random_role_tracks = [track for track in self.tracks[video] if track.role_id == other_random_role]
 
-                # DECISION: Tomar 100% de tracks de ese role_id + Tomar random 50% de tracks de otro role_id
-                elif decision == 2:
-                    # get 100% of tracks from random_role
-                    num_this_tracks_from_random_role = len(random_role_tracks)                    
-                    this_tracks = random.sample(random_role_tracks, num_this_tracks_from_random_role)
+                        if len(other_random_role_tracks) < max_num_this_tracks_from_other_random_role:
+                            this_tracks.extend(other_random_role_tracks)
+                        else:
+                            this_tracks.extend(random.sample(other_random_role_tracks, min_num_this_tracks_from_other_random_role))
 
-                    # get 50% of tracks from other_random_role
-                    min_num_this_tracks_from_other_random_role = round((num_this_tracks_from_random_role / 2) * 0.7)
-                    max_num_this_tracks_from_other_random_role = round((num_this_tracks_from_random_role / 2) * 1.3)
-                    other_random_role = random.choice(list(role_id_in_video))
-                    while (other_random_role == random_role or 
-                           len([track for track in self.tracks[video] if track.role_id == other_random_role]) < min_num_this_tracks_from_other_random_role):
+                    # DECISION: Tomar 100% de tracks de ese role_id + Tomar random 50% de tracks de otro role_id
+                    elif decision == 2:
+                        # get 100% of tracks from random_role
+                        num_this_tracks_from_random_role = len(random_role_tracks)                    
+                        this_tracks = random.sample(random_role_tracks, num_this_tracks_from_random_role)
+
+                        # get 50% of tracks from other_random_role
+                        min_num_this_tracks_from_other_random_role = round((num_this_tracks_from_random_role / 2) * 0.7)
+                        max_num_this_tracks_from_other_random_role = round((num_this_tracks_from_random_role / 2) * 1.3)
                         other_random_role = random.choice(list(role_id_in_video))
-                    other_random_role_tracks = [track for track in self.tracks[video] if track.role_id == other_random_role]
 
-                    if len(other_random_role_tracks) < max_num_this_tracks_from_other_random_role:
-                        this_tracks.extend(other_random_role_tracks)
+                        counter = 0
+                        while (other_random_role == random_role or 
+                            len([track for track in self.tracks[video] if track.role_id == other_random_role]) < min_num_this_tracks_from_other_random_role):
+                            other_random_role = random.choice(list(role_id_in_video))
+                            counter += 1
+                            if counter == 10:
+                                raise SkipIteration
+                        other_random_role_tracks = [track for track in self.tracks[video] if track.role_id == other_random_role]
+
+                        if len(other_random_role_tracks) < max_num_this_tracks_from_other_random_role:
+                            this_tracks.extend(other_random_role_tracks)
+                        else:
+                            this_tracks.extend(random.sample(other_random_role_tracks, min_num_this_tracks_from_other_random_role))
+
+                    # DECISION: Tomar 100% de tracks de ese role_id + Tomar random 100% de tracks de otro role_id
                     else:
-                        this_tracks.extend(random.sample(other_random_role_tracks, min_num_this_tracks_from_other_random_role))
+                        # get 100% of tracks from random_role
+                        num_this_tracks_from_random_role = len(random_role_tracks)                    
+                        this_tracks = random.sample(random_role_tracks, num_this_tracks_from_random_role)
 
-                # DECISION: Tomar 100% de tracks de ese role_id + Tomar random 100% de tracks de otro role_id
-                else:
-                    # get 100% of tracks from random_role
-                    num_this_tracks_from_random_role = len(random_role_tracks)                    
-                    this_tracks = random.sample(random_role_tracks, num_this_tracks_from_random_role)
-
-                    # get 100% of tracks from other_random_role
-                    min_num_this_tracks_from_other_random_role = round((num_this_tracks_from_random_role) * 0.7)
-                    max_num_this_tracks_from_other_random_role = round((num_this_tracks_from_random_role) * 1.3)
-                    other_random_role = random.choice(list(role_id_in_video))
-                    while (other_random_role == random_role or 
-                           len([track for track in self.tracks[video] if track.role_id == other_random_role]) < min_num_this_tracks_from_other_random_role):
+                        # get 100% of tracks from other_random_role
+                        min_num_this_tracks_from_other_random_role = round((num_this_tracks_from_random_role) * 0.7)
+                        max_num_this_tracks_from_other_random_role = round((num_this_tracks_from_random_role) * 1.3)
                         other_random_role = random.choice(list(role_id_in_video))
-                    other_random_role_tracks = [track for track in self.tracks[video] if track.role_id == other_random_role]
 
-                    if len(other_random_role_tracks) < max_num_this_tracks_from_other_random_role:
-                        this_tracks.extend(other_random_role_tracks)
-                    else:
-                        this_tracks.extend(random.sample(other_random_role_tracks, min_num_this_tracks_from_other_random_role))
+                        counter = 0
+                        while (other_random_role == random_role or 
+                            len([track for track in self.tracks[video] if track.role_id == other_random_role]) < min_num_this_tracks_from_other_random_role):
+                            other_random_role = random.choice(list(role_id_in_video))
+                            counter += 1
+                            if counter == 10:
+                                raise SkipIteration
+                        other_random_role_tracks = [track for track in self.tracks[video] if track.role_id == other_random_role]
 
-                # the rest of the tracks will be in rest_tracks
-                rest_tracks = [track for track in self.tracks[video] if track not in this_tracks]
+                        if len(other_random_role_tracks) < max_num_this_tracks_from_other_random_role:
+                            this_tracks.extend(other_random_role_tracks)
+                        else:
+                            this_tracks.extend(random.sample(other_random_role_tracks, min_num_this_tracks_from_other_random_role))
 
-                # check if the split was done correctly
-                sorted_list = sorted((this_tracks + rest_tracks), key=lambda track: track.track_id)
-                assert sorted_list == self.tracks[video], f"Error after splitting tracks: this_tracks + rest_tracks != tracks[video]"
+                    # the rest of the tracks will be in rest_tracks
+                    rest_tracks = [track for track in self.tracks[video] if track not in this_tracks]
 
-                # create the ClusterScenario and append it to the list
-                cluster_scenario = ClusterScenario(this_tracks_role_id=random_role, this_tracks=this_tracks, rest_tracks=rest_tracks, is_valid=False)
-                self.cluster_scenarios.append(cluster_scenario)
+                    # check if the split was done correctly
+                    sorted_list = sorted((this_tracks + rest_tracks), key=lambda track: track.track_id)
+                    assert sorted_list == self.tracks[video], f"Error after splitting tracks: this_tracks + rest_tracks != tracks[video]"
+
+                    # create the ClusterScenario and append it to the list
+                    cluster_scenario = ClusterScenario(this_tracks_role_id=random_role, this_tracks=this_tracks, rest_tracks=rest_tracks, is_valid=False)
+                    self.cluster_scenarios.append(cluster_scenario)
+                
+                except SkipIteration:
+                    continue
 
     def __len__(self) -> int:
         return len(self.cluster_scenarios)
@@ -209,13 +232,8 @@ class ClusterClassificationDataset(Dataset):
 
 
 if __name__ == "__main__":
-    data_path = "../../data/SoccerNetGS/valid"
-    videos_list = ["SNGS-021"] # , "SNGS-039", "SNGS-078"]
-    homogeneity_threshold = 0.9
-    scenarios_per_video = 100
+    train_data_path = "../../data/SoccerNetGS/train"
+    valid_data_path = "../../data/SoccerNetGS/valid"
 
-    dataset = ClusterClassificationDataset(data_path, videos_list, homogeneity_threshold, scenarios_per_video)
-    scenarios = []
-    for i in range(len(dataset)):
-        scenario, role_id = dataset[i]
-        scenarios.append(scenario)
+    train_dataset = ClusterClassificationDataset(train_data_path)
+    valid_dataset = ClusterClassificationDataset(valid_data_path)

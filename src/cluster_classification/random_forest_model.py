@@ -34,7 +34,7 @@ def run_random_forest_model(train_dataset: ClusterClassificationDataset, valid_d
     y_pred = rf.predict(X_valid)
 
     cm = confusion_matrix(y_valid, y_pred)
-    ConfusionMatrixDisplay(confusion_matrix=cm).plot();
+    ConfusionMatrixDisplay(confusion_matrix=cm).plot()
 
     accuracy = round(accuracy_score(y_valid, y_pred), 4)
     precision = round(precision_score(y_valid, y_pred, average='weighted'), 4)

@@ -34,7 +34,7 @@ def run_xgboost_model(train_dataset: ClusterClassificationDataset, valid_dataset
     y_pred = bst.predict(X_valid)
 
     cm = confusion_matrix(y_valid, y_pred)
-    ConfusionMatrixDisplay(confusion_matrix=cm).plot();
+    ConfusionMatrixDisplay(confusion_matrix=cm).plot()
 
     accuracy = round(accuracy_score(y_valid, y_pred), 4)
     precision = round(precision_score(y_valid, y_pred, average='weighted'), 4)
