@@ -196,17 +196,8 @@ if __name__ == "__main__":
         raise Exception("No path to trained model was provided")
 
     # Load data
-<<<<<<< HEAD
-    dataset = SoccerNetGSDataset(
-        dataset_path=data_path, videos_list=videos_list, transform=TRANSFORM
-    )
-    sampler = SoccerNetGSBatchSampler(
-        dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_video_batch
-    )
-=======
     dataset = SoccerNetGSDataset(dataset_path=data_path, videos_list=videos_list, transform=TRANSFORM)
     sampler = SoccerNetGSBatchSampler(dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_video_batch)
->>>>>>> feature/PRTReid_train_and_run
     loader = DataLoader(dataset, batch_sampler=sampler, num_workers=num_workers)
 
     model_run(loader, model, device, output_path, model_path)
