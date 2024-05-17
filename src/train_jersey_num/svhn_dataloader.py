@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 
 class SVHNDataset(Dataset):
-    def __init__(self, root, transform=None):
+    def __init__(self, root, split, transform=None):
         total = 0
         capped_total = 0
         self.root = root
@@ -16,21 +16,20 @@ class SVHNDataset(Dataset):
         images_folder = os.path.join(self.root, "images")
         labels_folder = os.path.join(self.root, "labels")
 
-        for split_folder in ["train", "test"]:
-            images_split_folder = os.path.join(images_folder, split_folder)
-            labels_split_folder = os.path.join(labels_folder, split_folder)
+        images_split_folder = os.path.join(images_folder, split)
+        labels_split_folder = os.path.join(labels_folder, split)
 
-            for filename in tqdm(
-                os.listdir(images_split_folder), desc=f"Loading {split_folder} images"
-            ):
-                if filename.lower().endswith(".jpg"):
-                    total += 1
-                    img_path = os.path.join(images_split_folder, filename)
-                    label = self._get_label(labels_split_folder, filename)
-                    # Check if label has maximum two digits
-                    if len(label) <= 2:
-                        capped_total += 1
-                        self.data.append({"path": img_path, "label": int(label)})
+        for filename in tqdm(
+            os.listdir(images_split_folder), desc=f"Loading {split} images"
+        ):
+            if filename.lower().endswith(".jpg"):
+                total += 1
+                img_path = os.path.join(images_split_folder, filename)
+                label = self._get_label(labels_split_folder, filename)
+                # Check if label has maximum two digits
+                if len(label) <= 2:
+                    capped_total += 1
+                    self.data.append({"path": img_path, "label": int(label)})
 
         print("Total:", total)
         print("Capped:", capped_total)
@@ -51,9 +50,9 @@ class SVHNDataset(Dataset):
     def __getitem__(self, idx):
         img_path = self.data[idx]["path"]
         label = self.data[idx]["label"]
-        image = Image.open(img_path)
+        original_image = Image.open(img_path)
         if self.transform:
-            image = self.transform(image)
+            image = self.transform(original_image)
         return image, label
 
 
