@@ -5,7 +5,7 @@ parent_dir = os.path.dirname(os.path.dirname(__file__))
 sys.path.append(parent_dir)
 from SNGS_dataset.groundtruth_reader import GroundTruthReader
 from dataclasses import dataclass
-from typing import List, Dict
+from typing import List, Dict, Optional
 from collections import defaultdict
 from torch.utils.data import Dataset
 from tqdm import tqdm
@@ -40,7 +40,7 @@ class Track:
 
 @dataclass
 class ClusterScenario:
-    this_tracks_role_id: int
+    this_tracks_role_id: Optional[int]
     this_tracks: List[Track]
     rest_tracks: List[Track]
     is_valid: bool
@@ -218,7 +218,7 @@ class ClusterClassificationDataset(Dataset):
                     assert sorted_list == self.tracks[video], f"Error after splitting tracks: this_tracks + rest_tracks != tracks[video]"
 
                     # create the ClusterScenario and append it to the list
-                    cluster_scenario = ClusterScenario(this_tracks_role_id=random_role, this_tracks=this_tracks, rest_tracks=rest_tracks, is_valid=False)
+                    cluster_scenario = ClusterScenario(this_tracks_role_id=None, this_tracks=this_tracks, rest_tracks=rest_tracks, is_valid=False)
                     self.cluster_scenarios.append(cluster_scenario)
                 
                 except SkipIteration:
@@ -228,7 +228,7 @@ class ClusterClassificationDataset(Dataset):
         return len(self.cluster_scenarios)
 
     def __getitem__(self, idx: int) -> ClusterScenario:
-        return self.cluster_scenarios[idx], self.cluster_scenarios[idx].this_tracks_role_id
+        return self.cluster_scenarios[idx]
 
 
 if __name__ == "__main__":
