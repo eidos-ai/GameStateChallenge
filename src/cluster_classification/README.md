@@ -1,10 +1,10 @@
 # Documentation for the cluster_classification scripts and classes
 
-- [Cluster Classification Dataset](#ClusterClassificationDataset)
-- [Cluster Classification Model](#ClusterClassificationModel)
+- [Cluster Classification Dataset](#cluster-classification-dataset)
+- [Cluster Classification Model](#cluster-classification-model)
 
 ## Cluster Classification Dataset
-#### cluster_classification_dataset.py
+### cluster_classification_dataset.py
 This dataset inherits from Torch Dataset and returns ClusterScenario instances.
 
 The class takes the following arguments:
@@ -14,7 +14,7 @@ The class takes the following arguments:
 - `scenarios_per_video` (int, default=100): number of valid plus invalid ClusterScenario instances created from each video (currently balanced).
 
 ## Cluster Classification Model
-#### cluster_classification_model.py 
+### cluster_classification_model.py 
 This script is used to run a either a Random Forest or XGBoost Classification Model which its input are extracted features as average position, number of tracks in cluster, etc. The output is measured using the model metrics and the ultimate goal is to use the KMeans number of clusters with the best accuracy.
 
 The script takes the following **required** arguments:
