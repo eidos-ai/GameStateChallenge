@@ -4,8 +4,42 @@ from typing import Optional, Callable
 from SNGS_dataset.groundtruth_reader import GroundTruthReader
 from PIL import Image
 from dataclasses import asdict
+from typing import List, Tuple, Dict, Any
+from torchvision.transforms import ToTensor
+import torch
 
+# This collate_fn is necesary to avoid problems due to None values on some labels
+def soccernet_dataset_collate_fn(batch: List[Tuple[Any, Dict]]) -> Tuple[List[Any], List[Dict]]:
+     # Transform to convert PIL images to tensors
+    to_tensor = ToTensor()
+    
+    # Initialize the images list and a dictionary to hold processed labels
+    images = []
+    batch_labels = {}
 
+    for img, label in batch:
+        # Convert image to tensor if it is a PIL Image, otherwise check if it's already a tensor
+        images.append(img)
+
+        # Initialize the dictionary structure for batch_labels based on the first label
+        if not batch_labels:
+            for key in label.keys():
+                batch_labels[key] = []
+
+        # Append each attribute of the label to the corresponding list in batch_labels
+        for key in label.keys():
+            if key == 'bbox':
+                # Special handling for 'bbox' to ensure no None values and correct structure
+                bbox_dict = {sub_key: label['bbox'].get(sub_key, 0) if label['bbox'] else 0 for sub_key in ['x', 'y', 'w', 'h', 'x_pitch', 'y_pitch']}
+                batch_labels['bbox'].append(bbox_dict)
+            else:
+                batch_labels[key].append(label.get(key, ''))
+
+    # Convert images list to a tensor
+    images = torch.stack(images, dim=0)
+    
+    return images, batch_labels
+    
 class SoccerNetGSDataset(Dataset):
     def __init__(
         self,
@@ -39,7 +73,6 @@ class SoccerNetGSDataset(Dataset):
         right = label["bbox"]["x"] + label["bbox"]["w"]
         bottom = label["bbox"]["y"] + label["bbox"]["h"]
         img_crop = pil_img.crop((left, top, right, bottom))
-
         if self.transform:
             img_crop = self.transform(img_crop)
         if self.target_transform:
