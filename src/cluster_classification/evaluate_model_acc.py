@@ -22,13 +22,18 @@ class ClusterPredictionModel():
     def __init__(self, model_path):
         self.model = joblib.load(model_path)
         self.cluster_feats = ClusterFeats()
-    
+        
+    # Predicts most likely role_id for the cluster, but ruling out a invalid clustering
     def predict_cluster_label(self, cluster_tracks : List[Track], rest_tracks: List[Track]) -> float:
         feats = self.cluster_feats.forward(cluster_tracks, rest_tracks)
         feats_vector = np.array([feats.to_vector()])
-        pred = self.model.predict(feats_vector)
-        return pred[0]
+        pred_proba = self.model.predict_proba(feats_vector)[0]
+        # This method wont return invalid track
+        probs_role_ids = pred_proba[:-1]
+        highest_prob_class = np.argmax(probs_role_ids)
+        return highest_prob_class
     
+    # Predicts the probability of this cluster being a valid cluster
     def predict_score_cluster_valid(self, cluster_tracks : List[Track], rest_tracks: List[Track]) -> float:
         feats = self.cluster_feats.forward(cluster_tracks, rest_tracks)
         feats_vector = np.array([feats.to_vector()])
@@ -57,9 +62,9 @@ def eval_clustering_confidence(clustering: TrackClustering, model, gt_reader: Gr
     video_tracks: List[Track] = get_tracks([clustering.video], gt_reader)[clustering.video]
     clustering_valid_scores = [predict_cluster_valid_score(cluster, model, video_tracks) for cluster in clustering.clusters]
     # All have to be valid
-    # clustering_score = reduce(operator.mul, clustering_valid_scores , 1)
+    clustering_score = reduce(operator.mul, clustering_valid_scores , 1)
     # Mean of being valid
-    clustering_score = np.mean(clustering_valid_scores)
+    # clustering_score = np.mean(clustering_valid_scores)
     return clustering_score
 
 def cluster_to_tracks(clustering: TrackClustering, model, gt_reader: GroundTruthReader) -> List[ClassifiedTrack]:
@@ -107,8 +112,8 @@ def evaluate_clustering_on_real_data(data_path: str, real_cluster_path: str, mod
     
     # Evaluate each video
     videos_correct_clustering = []
-    videos_track_acc = []
-    videos_bbox_acc = []
+    videos_track_acc, videos_bbox_acc = [], []
+    best_videos_track_acc, best_videos_bbox_acc= [], []
     for video in tqdm(videos_list, total=len(videos_list), desc='Iterating over videos'):
         # Evaluate clusterings for every possible kmeans
         video_clusterings: List[TrackClustering] = [c for c in real_dataset if c.video == video]
@@ -116,6 +121,7 @@ def evaluate_clustering_on_real_data(data_path: str, real_cluster_path: str, mod
             
         # The best clustering is that one with greatest valid probability
         best_clustering: TrackClustering = video_clusterings[clustering_confidences.index(max(clustering_confidences))]
+        true_clustering = next((c for c in video_clusterings if c.is_valid))
         
         # Was chosen clustering the correct one?
         is_video_clustering_correct = best_clustering.is_valid
@@ -129,6 +135,19 @@ def evaluate_clustering_on_real_data(data_path: str, real_cluster_path: str, mod
         videos_track_acc.append(track_acc)
         videos_bbox_acc.append(bbox_acc)
         
+        # Get Metrics for right clustering
+        best_track_predictions = cluster_to_tracks(true_clustering, model, gt_reader)
+        best_track_acc, best_bbox_acc = evaluate_track_accuracy(best_track_predictions, video_tracks)
+        best_videos_track_acc.append(best_track_acc)
+        best_videos_bbox_acc.append(best_bbox_acc)
+        
+#         print("/////")
+#         print(true_clustering)
+#         for cluster in true_clustering.clusters:
+#             print(cluster)
+#             gt_roles = [next((v for v in video_tracks if v.track_id == t)).role_id for t in cluster.track_ids]
+#             print(gt_roles)
+#         print(best_track_predictions)
         
      
     correct_clustering = len(videos_correct_clustering) / len(videos_list) * 100
@@ -139,6 +158,12 @@ def evaluate_clustering_on_real_data(data_path: str, real_cluster_path: str, mod
     
     avg_bbox_acc = np.mean(videos_bbox_acc) * 100
     print(f"Average Bbox role_id Accuracy {avg_bbox_acc:.2f}")
+    
+    best_avg_track_acc = np.mean(best_videos_track_acc) * 100
+    print(f"True Clustering Track role_id Accuracy {best_avg_track_acc:.2f}")
+    
+    best_avg_bbox_acc = np.mean(best_videos_bbox_acc) * 100
+    print(f"True Clustering Average Bbox role_id Accuracy {best_avg_bbox_acc:.2f}")
       
              
 if __name__ == "__main__":

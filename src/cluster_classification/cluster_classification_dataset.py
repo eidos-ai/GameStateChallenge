@@ -97,10 +97,10 @@ class ClusterClassificationDataset(Dataset):
 
         # iterate over all videos
         for video in tqdm(self.videos_list, total=len(self.videos_list), desc='Initializing ClusterClassificationDataset', disable = True):
-
+            if len(self.tracks[video]) == 0:
+                continue
             # get every role_id present in the video
             role_id_in_video = {track.role_id for track in self.tracks[video]}
-
             # create valid ClusterScenarios
             for valid_scenario in tqdm(range(amount_of_valid_scenarios), total=amount_of_valid_scenarios, desc=f'Valid scenarios of video {video}', disable = True):
                 # randomly choose a role_id and get the tracks that have it as role_id, and the ones that do not

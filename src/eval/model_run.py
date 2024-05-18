@@ -13,8 +13,10 @@ from models.resnet import ResnetMLP
 from models.resnet import TRANSFORM
 # from models.prtreid_wrapper import PRTReId
 from collections import defaultdict
+
+from typing import List, Tuple
 from torch.utils.data import DataLoader
-from SNGS_dataset.dataset import SoccerNetGSDataset
+from SNGS_dataset.dataset import SoccerNetGSDataset, soccernet_dataset_collate_fn
 from SNGS_dataset.sampler import SoccerNetGSBatchSampler
 
 
@@ -197,7 +199,8 @@ if __name__ == "__main__":
 
     # Load data
     dataset = SoccerNetGSDataset(dataset_path=data_path, videos_list=videos_list, transform=TRANSFORM)
-    sampler = SoccerNetGSBatchSampler(dataset.labels, n_videos=n_videos_batch, n_samples=n_samples_video_batch)
-    loader = DataLoader(dataset, batch_sampler=sampler, num_workers=num_workers)
+    
 
+    loader = DataLoader(dataset,  batch_size=16, num_workers=num_workers, collate_fn= soccernet_dataset_collate_fn)
+    
     model_run(loader, model, device, output_path, model_path)
