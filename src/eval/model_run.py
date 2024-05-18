@@ -11,7 +11,7 @@ from tqdm import tqdm
 from typing import Any
 from models.resnet import ResnetMLP
 from models.resnet import TRANSFORM
-from models.prtreid_wrapper import PRTReId
+# from models.prtreid_wrapper import PRTReId
 from collections import defaultdict
 from torch.utils.data import DataLoader
 from SNGS_dataset.dataset import SoccerNetGSDataset

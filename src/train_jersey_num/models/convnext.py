@@ -62,3 +62,6 @@ class ConvNext(pl.LightningModule):
     def img_features(self, imgs_paths: List[Path], device: str="cuda"):
         with torch.no_grad():
             return self(self.preprocess_imgs(imgs_paths, device))
+        
+    def load_model(self, model_path):
+        self.load_state_dict(torch.load(model_path))
