@@ -57,9 +57,12 @@ class Annotation:
 
 
 class GroundTruthReader:
-    def __init__(self, dataset_path: str, videos_list: Optional[list[str]]) -> None:
+    def __init__(self, dataset_path: str, videos_list: Optional[list[str]] = None) -> None:
         self.dataset_path = dataset_path
-        self.videos_list = videos_list
+        if videos_list is not None:
+            self.videos_list = videos_list
+        else:
+            self.videos_list = [p for p in os.listdir(self.dataset_path) if os.path.isdir(os.path.join(self.dataset_path, p)) and p[:5] == "SNGS-"]
         self.person_categories = [1, 2, 3, 7]  # 1: player, 2: goalkeeper, 3: referee, 7: other
         self.annotations = self.get_annotations()
         self.annotations_df = pd.DataFrame([asdict(ann) for ann in self.annotations])

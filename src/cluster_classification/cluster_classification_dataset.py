@@ -52,7 +52,9 @@ class ClusterScenario:
 
 def get_tracks(videos_list: List[str], gt_reader: GroundTruthReader) -> Dict[str, List[Track]]:
     total_tracks = defaultdict(list)
-    for video in tqdm(videos_list, total=len(videos_list), desc='Getting tracks'):
+    if (videos_list is None) or (len(videos_list) == 0):
+        videos_list = gt_reader.videos_list
+    for video in tqdm(videos_list, total=len(videos_list), desc='Getting tracks', disable = True):
         if video[:5] != "SNGS-":
             continue
         video_tracks = []
@@ -94,13 +96,13 @@ class ClusterClassificationDataset(Dataset):
         self.cluster_scenarios = []
 
         # iterate over all videos
-        for video in tqdm(self.videos_list, total=len(self.videos_list), desc='Initializing ClusterClassificationDataset'):
+        for video in tqdm(self.videos_list, total=len(self.videos_list), desc='Initializing ClusterClassificationDataset', disable = True):
 
             # get every role_id present in the video
             role_id_in_video = {track.role_id for track in self.tracks[video]}
 
             # create valid ClusterScenarios
-            for valid_scenario in tqdm(range(amount_of_valid_scenarios), total=amount_of_valid_scenarios, desc=f'Valid scenarios of video {video}'):
+            for valid_scenario in tqdm(range(amount_of_valid_scenarios), total=amount_of_valid_scenarios, desc=f'Valid scenarios of video {video}', disable = True):
                 # randomly choose a role_id and get the tracks that have it as role_id, and the ones that do not
                 random_role = random.choice(list(role_id_in_video))
                 random_role_tracks = [track for track in self.tracks[video] if track.role_id == random_role]
@@ -125,7 +127,7 @@ class ClusterClassificationDataset(Dataset):
                 cluster_scenario = ClusterScenario(this_tracks_role_id=random_role, this_tracks=this_tracks, rest_tracks=rest_tracks, is_valid=True)
                 self.cluster_scenarios.append(cluster_scenario)
 
-            for invalid_scenario in tqdm(range(amount_of_invalid_scenarios), total=amount_of_invalid_scenarios, desc=f'Invalid scenarios of video {video}'):
+            for invalid_scenario in tqdm(range(amount_of_invalid_scenarios), total=amount_of_invalid_scenarios, desc=f'Invalid scenarios of video {video}', disable = True):
                 # randomly choose a role_id and get the tracks that have it as role_id, and the ones that do not
                 try:
                     random_role = random.choice(list(role_id_in_video))

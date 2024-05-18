@@ -597,7 +597,7 @@ class ResnetMLP(nn.Module):
             self.model = resnext101_32x8d(fc_dims=fc_dims, **kwargs)
             
     def forward(self, x):
-        _, result = self.model(x)
+        result = self.model(x)
         return result
 
 
