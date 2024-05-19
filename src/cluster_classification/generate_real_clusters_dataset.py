@@ -154,7 +154,7 @@ if __name__ == "__main__":
         "--data_path",
         type=str,
         required=False,
-        default="../../data/SoccerNetGS/valid",
+        default="../../data/SoccerNetGS/test",
         help="Path to the dataset.",
     )
     parser.add_argument(

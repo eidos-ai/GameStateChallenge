@@ -7,6 +7,9 @@ from torch.utils.data import ConcatDataset
 from dataclasses import dataclass
 from cluster_classification_dataset import ClusterClassificationDataset
 from real_clusters_dataset import RealClustersDataset
+from SNGS_dataset.groundtruth_reader import GroundTruthReader 
+from evaluate_model_acc import evaluate_clustering
+
 from cluster_feats import ClusterFeats
 from torch.utils.data import Dataset
 from sklearn.ensemble import RandomForestClassifier
@@ -57,8 +60,7 @@ class DatasetRegistry:
         if conf.test_clustering_path:
             test_clustering_dataset = RealClustersDataset(conf.test_data_path, conf.test_clustering_path)
         else:
-            test_clustering_dataset = None
-            
+            test_clustering_dataset = None                    
         
         self.registry = {
             'synth_train': train_dataset,
@@ -110,7 +112,8 @@ def evaluate_model(model_instance, dataset_name: str, dataset: Dataset):
     print(f"{dataset_name} - accuracy:", accuracy)
     print(f"{dataset_name} - precision:", precision)
     print(f"{dataset_name} - recall:", recall)
-    
+
+
 
 def run_model(model: str, store_model: str, train_dataset: Dataset, valid_dataset: List[Tuple[str, Dataset]], 
                                                                                         
@@ -153,11 +156,21 @@ def run_model(model: str, store_model: str, train_dataset: Dataset, valid_datase
     # Evaluate
     for dataset_name, dataset in valid_dataset:
         evaluate_model(model_instance, dataset_name, dataset)
+        if isinstance(dataset, RealClustersDataset):
+            track_metrics = evaluate_clustering(dataset, model_instance)
+            print(f"///// Evaluation Clustering on {dataset_name}")
+            print(f"% of videos with correct clustering found: {track_metrics.percent_correct_clustering:.2f}%")
+            print(f"Average Track role_id Accuracy {track_metrics.average_track_accuracy * 100:.2f}")
+            print(f"Average Bbox role_id Accuracy {track_metrics.average_bbox_accuracy * 100:.2f}")
+            print(f"True Clustering Track role_id Accuracy {track_metrics.average_best_track_accuracy * 100:.2f}")
+            print(f"True Clustering Average Bbox role_id Accuracy {track_metrics.average_best_bbox_accuracy * 100:.2f}")
 
     # Save model
     if store_model is not None:
         joblib.dump(model_instance, store_model)
         print(f"Saved model to {store_model}")
+        
+    
 
 
 if __name__ == "__main__":

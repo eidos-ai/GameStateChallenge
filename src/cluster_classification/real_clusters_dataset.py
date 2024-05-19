@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 import json
 from torch.utils.data import Dataset
-from cluster_classification_dataset import ClusterScenario, get_tracks
+from cluster_classification_dataset import ClusterScenario, get_tracks, Track
 from SNGS_dataset.groundtruth_reader import GroundTruthReader
 
 @dataclass
@@ -27,15 +27,21 @@ class TrackClustering:
     clusters: List[TrackCluster]
     video: str
     is_valid: bool
+    # Annotations of Tracks for that video
+    gt_tracks: Optional[List[Track]]
     
 
 class RealClustersDataset(Dataset):
     def __init__(self, data_path: str, cluster_path: str, videos_list: List[str]=None) -> None:
-        clusterings: List[TrackClustering] = read_track_clustering_file(cluster_path)
-        gt_reader = GroundTruthReader(data_path, videos_list)
-        all_tracks = get_tracks(videos_list, gt_reader)
+        self.gt_reader = GroundTruthReader(data_path, videos_list)
+        all_tracks = get_tracks(videos_list, self.gt_reader)
+
+        self.clusterings: List[TrackClustering] = read_track_clustering_file(cluster_path)
+        for t in self.clusterings:
+            t.gt_tracks = all_tracks[t.video]
+            
         self.cluster_scenarios = []
-        for clustering in clusterings:
+        for clustering in self.clusterings:
             for c in clustering.clusters:
                 this_tracks = [t for t in all_tracks[clustering.video] if t.track_id in c.track_ids]
                 other_tracks = [t for t in all_tracks[clustering.video] if t.track_id not in c.track_ids]
@@ -53,6 +59,11 @@ class RealClustersDataset(Dataset):
 
     def __getitem__(self, idx: int) -> ClusterScenario:
         return self.cluster_scenarios[idx]
+    
+    # Returns list of clusterings instead of single clusters
+    def get_clusterings(self) ->  List[TrackClustering]:
+        return self.clusterings
+    
 
 def read_track_clustering_file(clusters_path: str) -> List[TrackClustering]:
     with open(clusters_path, 'r') as file:
@@ -101,7 +112,7 @@ def dict_to_track_clustering(data: dict) -> TrackClustering:
     is_valid = data["is_valid"]
     
     # Create the TrackClustering dataclass instance
-    return TrackClustering(clusters=clusters, video=video, is_valid=is_valid)
+    return TrackClustering(clusters=clusters, video=video, is_valid=is_valid, gt_tracks=None)
 
 
         

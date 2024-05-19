@@ -13,6 +13,14 @@ The class takes the following arguments:
 - `homogeneity_threshold` (float, default=0.9): proportion (between 0 and 1) of Track instances from `ClusterScenario.this_tracks` in which `ClusterScenario.this_tracks_role_id == Track.role_id`, to have `ClusterScenario.is_valid == True`.
 - `scenarios_per_video` (int, default=100): number of valid plus invalid ClusterScenario instances created from each video (currently balanced).
 
+# Real Cluster Dataset
+This dataset has clusterings made by applying different KMeans models to embeddings produced by a trained model.
+To generate this datasets, first store embeddings on a path and then execute.
+<pre>
+python generate_real_clusters_dataset.py --embeddings_path ../../output/tmp/GAM-226_embeddings/ --out_dataset_path GAM226clusters_test.json
+</pre>
+It will save Real Cluster Dataset to GAM226clusters_test.json
+
 ## Cluster Classification Model
 ### cluster_classification_model.py 
 This script is used to run a either a Random Forest or XGBoost Classification Model which its input are extracted features as average position, number of tracks in cluster, etc. The output is measured using the model metrics and the ultimate goal is to use the KMeans number of clusters with the best accuracy.
