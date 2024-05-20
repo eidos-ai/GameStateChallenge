@@ -68,7 +68,16 @@ class GroundTruthReader:
 
     def get_annotations(self) -> list[Annotation]:
         annotations = []
+        
         video_paths = [os.path.join(self.dataset_path, video) for video in self.videos_list if os.path.isdir(os.path.join(self.dataset_path, video))]
+        # uncomment this (and comment previous line) if want to reduce execution time
+        # video_paths = []
+        # if "train" in self.dataset_path:
+        #     video_paths = [os.path.join(self.dataset_path, "SNGS-060"), os.path.join(self.dataset_path, "SNGS-097"), os.path.join(self.dataset_path, "SNGS-151")]
+        # elif "valid" in self.dataset_path:
+        #     video_paths = [os.path.join(self.dataset_path, "SNGS-036"), os.path.join(self.dataset_path, "SNGS-039"), os.path.join(self.dataset_path, "SNGS-078")]
+        # elif "test" in self.dataset_path:
+        #     video_paths = [os.path.join(self.dataset_path, "SNGS-116"), os.path.join(self.dataset_path, "SNGS-133"), os.path.join(self.dataset_path, "SNGS-187")]
 
         def process_video(video_path):
             video_annotations = []
