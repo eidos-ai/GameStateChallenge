@@ -5,7 +5,7 @@ parent_dir = os.path.dirname(os.path.dirname(__file__))
 sys.path.append(parent_dir)
 from SNGS_dataset.groundtruth_reader import GroundTruthReader
 from dataclasses import dataclass
-from typing import List, Dict
+from typing import List, Dict, Optional
 from collections import defaultdict
 from torch.utils.data import Dataset
 from tqdm import tqdm
@@ -40,7 +40,7 @@ class Track:
 
 @dataclass
 class ClusterScenario:
-    this_tracks_role_id: int
+    this_tracks_role_id: Optional[int]
     this_tracks: List[Track]
     rest_tracks: List[Track]
     is_valid: bool
@@ -52,7 +52,9 @@ class ClusterScenario:
 
 def get_tracks(videos_list: List[str], gt_reader: GroundTruthReader) -> Dict[str, List[Track]]:
     total_tracks = defaultdict(list)
-    for video in tqdm(videos_list, total=len(videos_list), desc='Getting tracks'):
+    if (videos_list is None) or (len(videos_list) == 0):
+        videos_list = gt_reader.videos_list
+    for video in tqdm(videos_list, total=len(videos_list), desc='Getting tracks', disable = True):
         if video[:5] != "SNGS-":
             continue
         video_tracks = []
@@ -94,13 +96,13 @@ class ClusterClassificationDataset(Dataset):
         self.cluster_scenarios = []
 
         # iterate over all videos
-        for video in tqdm(self.videos_list, total=len(self.videos_list), desc='Initializing ClusterClassificationDataset'):
-
+        for video in tqdm(self.videos_list, total=len(self.videos_list), desc='Initializing ClusterClassificationDataset', disable = True):
+            if len(self.tracks[video]) == 0:
+                continue
             # get every role_id present in the video
             role_id_in_video = {track.role_id for track in self.tracks[video]}
-
             # create valid ClusterScenarios
-            for valid_scenario in tqdm(range(amount_of_valid_scenarios), total=amount_of_valid_scenarios, desc=f'Valid scenarios of video {video}'):
+            for valid_scenario in tqdm(range(amount_of_valid_scenarios), total=amount_of_valid_scenarios, desc=f'Valid scenarios of video {video}', disable = True):
                 # randomly choose a role_id and get the tracks that have it as role_id, and the ones that do not
                 random_role = random.choice(list(role_id_in_video))
                 random_role_tracks = [track for track in self.tracks[video] if track.role_id == random_role]
@@ -125,7 +127,7 @@ class ClusterClassificationDataset(Dataset):
                 cluster_scenario = ClusterScenario(this_tracks_role_id=random_role, this_tracks=this_tracks, rest_tracks=rest_tracks, is_valid=True)
                 self.cluster_scenarios.append(cluster_scenario)
 
-            for invalid_scenario in tqdm(range(amount_of_invalid_scenarios), total=amount_of_invalid_scenarios, desc=f'Invalid scenarios of video {video}'):
+            for invalid_scenario in tqdm(range(amount_of_invalid_scenarios), total=amount_of_invalid_scenarios, desc=f'Invalid scenarios of video {video}', disable = True):
                 # randomly choose a role_id and get the tracks that have it as role_id, and the ones that do not
                 try:
                     random_role = random.choice(list(role_id_in_video))
@@ -218,7 +220,7 @@ class ClusterClassificationDataset(Dataset):
                     assert sorted_list == self.tracks[video], f"Error after splitting tracks: this_tracks + rest_tracks != tracks[video]"
 
                     # create the ClusterScenario and append it to the list
-                    cluster_scenario = ClusterScenario(this_tracks_role_id=random_role, this_tracks=this_tracks, rest_tracks=rest_tracks, is_valid=False)
+                    cluster_scenario = ClusterScenario(this_tracks_role_id=None, this_tracks=this_tracks, rest_tracks=rest_tracks, is_valid=False)
                     self.cluster_scenarios.append(cluster_scenario)
                 
                 except SkipIteration:
@@ -228,7 +230,7 @@ class ClusterClassificationDataset(Dataset):
         return len(self.cluster_scenarios)
 
     def __getitem__(self, idx: int) -> ClusterScenario:
-        return self.cluster_scenarios[idx], self.cluster_scenarios[idx].this_tracks_role_id
+        return self.cluster_scenarios[idx]
 
 
 if __name__ == "__main__":

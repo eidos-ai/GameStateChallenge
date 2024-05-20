@@ -1,7 +1,8 @@
 import numpy as np
 from dataclasses import dataclass, astuple
 from collections import defaultdict
-from cluster_classification_dataset import ClusterScenario
+from typing import List
+from cluster_classification_dataset import ClusterScenario, Track
 
 @dataclass
 class Feats:
@@ -24,19 +25,19 @@ class Feats:
 
 
 class ClusterFeats():
-    def forward(self, cluster_scenario: ClusterScenario) -> Feats:
+    def forward(self, this_tracks: List[Track], rest_tracks: List[Track]) -> Feats:
         x_avg_pos_this_tracks = 0
         y_avg_pos_this_tracks = 0
         x_avg_pos_rest_tracks = 0
         y_avg_pos_rest_tracks = 0
 
-        len_this_tracks = len(cluster_scenario.this_tracks)
-        len_rest_tracks = len(cluster_scenario.rest_tracks)
+        len_this_tracks = len(this_tracks)
+        len_rest_tracks = len(rest_tracks)
 
         not_none_bboxes_this_tracks = 0
         not_none_bboxes_rest_tracks = 0
 
-        for track in cluster_scenario.this_tracks:
+        for track in this_tracks:
             not_none_bboxes_this_tracks += len(track.bboxes)
 
             for bbox in track.bboxes:
@@ -46,7 +47,7 @@ class ClusterFeats():
                 else:
                     not_none_bboxes_this_tracks -= 1
 
-        for track in cluster_scenario.rest_tracks:
+        for track in rest_tracks:
             not_none_bboxes_rest_tracks += len(track.bboxes)
 
             for bbox in track.bboxes:
@@ -76,13 +77,13 @@ class ClusterFeats():
         else:
             y_avg_pos_rest_tracks = None
 
-        len_this_tracks = len(cluster_scenario.this_tracks)
-        len_rest_tracks = len(cluster_scenario.rest_tracks)
+        len_this_tracks = len(this_tracks)
+        len_rest_tracks = len(rest_tracks)
 
         this_tracks_per_frame = defaultdict(int)
         for i in range(1,751):
             this_tracks_per_frame[str(i)] = 0
-        for track in cluster_scenario.this_tracks:
+        for track in this_tracks:
             for bbox in track.bboxes:
                 bbox_frame = str(bbox.frame)[-3:]
                 this_tracks_per_frame[bbox_frame] += 1
@@ -92,7 +93,7 @@ class ClusterFeats():
         rest_tracks_per_frame = defaultdict(int)
         for i in range(1,751):
             rest_tracks_per_frame[str(i)] = 0
-        for track in cluster_scenario.rest_tracks:
+        for track in rest_tracks:
             for bbox in track.bboxes:
                 bbox_frame = str(bbox.frame)[-3:]
                 rest_tracks_per_frame[bbox_frame] += 1
