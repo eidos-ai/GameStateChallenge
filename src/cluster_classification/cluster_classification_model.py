@@ -161,7 +161,7 @@ def run_model(model: str, neptune_logger: NeptuneLogger, store_model: str, train
     for dataset_name, dataset in valid_dataset:
         evaluate_model(model_instance, dataset_name, dataset, neptune_logger)
         if isinstance(dataset, RealClustersDataset):
-            track_metrics = evaluate_clustering(dataset, model_instance)
+            track_metrics = evaluate_clustering(dataset, model_instance, neptune_logger)
             neptune_logger.log(f"evaluation/{dataset_name}/percent_correct_clustering",
                                track_metrics.percent_correct_clustering)
             neptune_logger.log(f"evaluation/{dataset_name}/average_track_accuracy",
@@ -172,6 +172,13 @@ def run_model(model: str, neptune_logger: NeptuneLogger, store_model: str, train
                                track_metrics.average_best_track_accuracy * 100)
             neptune_logger.log(f"evaluation/{dataset_name}/average_best_bbox_accuracy",
                                track_metrics.average_best_bbox_accuracy * 100)
+            # print("///////////////////////////////////////////////////////////////////////////")
+            # print(f'{dataset_name} metrics:')
+            # print("\n")
+            # for metrics in track_metrics.video_metrics:
+            #     print(metrics)
+            #     print("\n")
+            # print("///////////////////////////////////////////////////////////////////////////")
             # print(f"///// Evaluation Clustering on {dataset_name}")
             # print(f"% of videos with correct clustering found: {track_metrics.percent_correct_clustering:.2f}%")
             # print(f"Average Track role_id Accuracy {track_metrics.average_track_accuracy * 100:.2f}")
@@ -422,7 +429,10 @@ if __name__ == "__main__":
         
     if model == "random_forest":
         neptune_logger.param("model/n_estimators", rf_n_estimators)
-        neptune_logger.param("model/max_depth", rf_max_depth)
+        if rf_max_depth is None:
+            neptune_logger.param("model/max_depth", "None (default)")
+        else:
+            neptune_logger.param("model/max_depth", rf_max_depth)
         neptune_logger.param("model/criterion", rf_criterion)
     elif model == "xgboost":
         neptune_logger.param("model/n_estimators", xgb_n_estimators)
