@@ -16,7 +16,6 @@ class JerseyNumberDataset(Dataset):
         self.transform = transform
         self.include_number_not_seen = include_number_not_seen
         self.data = []
-        self.cache = {"video": None, "images": {}}
 
         # Iterate through subdirectories
         for label in os.listdir(dataset_folder):
