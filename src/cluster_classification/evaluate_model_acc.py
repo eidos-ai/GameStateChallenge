@@ -59,13 +59,15 @@ def predict_cluster_class(cluster: TrackCluster, model, video_tracks: List[Track
     return pred_cluster_class
     
 
-def eval_clustering_confidence(clustering: TrackClustering, model) -> float:
+def eval_clustering_confidence(clustering: TrackClustering, model, neptune_logger: NeptuneLogger) -> float:
     video_tracks: List[Track] = clustering.gt_tracks
     clustering_valid_scores = [predict_cluster_valid_score(cluster, model, video_tracks) for cluster in clustering.clusters]
     # All have to be valid
     clustering_score = reduce(operator.mul, clustering_valid_scores , 1)
+    neptune_logger.log(f"evaluation/clustering_score_method", "product")
     # Mean of being valid
     # clustering_score = np.mean(clustering_valid_scores)
+    # neptune_logger.log(f"evaluation/clustering_score_method", "mean")
     return clustering_score
 
 def cluster_to_tracks(clustering: TrackClustering, model) -> List[ClassifiedTrack]:
@@ -140,7 +142,7 @@ def evaluate_clustering(clustering_dataset: RealClustersDataset, prediction_mode
     
     for video in tqdm(videos_list, total=len(videos_list), desc='Iterating over videos'):
         video_clusterings: List[TrackClustering] = [c for c in clustering if c.video == video]
-        clustering_confidences = [eval_clustering_confidence(c, model) for c in video_clusterings]
+        clustering_confidences = [eval_clustering_confidence(c, model, neptune_logger) for c in video_clusterings]
         
         best_clustering: TrackClustering = video_clusterings[clustering_confidences.index(max(clustering_confidences))]
         true_clustering = next((c for c in video_clusterings if c.is_valid))
