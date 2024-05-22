@@ -62,12 +62,20 @@ def predict_cluster_class(cluster: TrackCluster, model, video_tracks: List[Track
 def eval_clustering_confidence(clustering: TrackClustering, model, neptune_logger: NeptuneLogger) -> float:
     video_tracks: List[Track] = clustering.gt_tracks
     clustering_valid_scores = [predict_cluster_valid_score(cluster, model, video_tracks) for cluster in clustering.clusters]
+    
     # All have to be valid
-    clustering_score = reduce(operator.mul, clustering_valid_scores , 1)
-    neptune_logger.log(f"evaluation/clustering_score_method", "product")
+    # clustering_score = reduce(operator.mul, clustering_valid_scores , 1)
+    # neptune_logger.log(f"evaluation/clustering_score_method", "product")
+    
     # Mean of being valid
     # clustering_score = np.mean(clustering_valid_scores)
     # neptune_logger.log(f"evaluation/clustering_score_method", "mean")
+    
+    # Weighted mean of being valid
+    clustering_valid_scores = [len(cluster.track_ids) * predict_cluster_valid_score(cluster, model, video_tracks) for cluster in clustering.clusters]
+    total_cluster_size = sum(len(cluster.track_ids) for cluster in clustering.clusters)
+    clustering_score = np.sum(clustering_valid_scores) / total_cluster_size
+    neptune_logger.log(f"evaluation/clustering_score_method", "weigh")
     return clustering_score
 
 def cluster_to_tracks(clustering: TrackClustering, model) -> List[ClassifiedTrack]:
