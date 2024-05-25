@@ -65,7 +65,7 @@ def eval(data_path, saved_path, enable_neptune, exp_name):
     
     # Accuracy
     acc = accuracy_score(labels,preds)
-    neptune_logger.log(f"evaluation/{split}/acc", acc)
+    neptune_logger.log(f"training/val_accuracy/soccernet_{split}", acc)
     logging.info(f"Accuracy on {split}: {acc}")
 
     # Acc for non-zero tracks
