@@ -1,0 +1,2 @@
+python save_detections.py --model_path ../../models/GAM-412_epoch0.pt  --out_path ../../experiments/track_jersey_num/exp1_valid --data_path ../../data/SoccerNetGS/valid
+python save_detections.py --model_path ../../models/GAM-412_epoch0.pt  --out_path ../../experiments/track_jersey_num/exp1_test --data_path ../../data/SoccerNetGS/test

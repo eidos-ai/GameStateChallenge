@@ -29,7 +29,8 @@ class Track:
     bboxes: List[BBox]
 
 class TrackJerseyNumberDataset(Dataset):
-    def __init__(self, dataset_folder, transform=None):
+    def __init__(self, dataset_folder, transform=None, return_img=True):
+        self.return_img = return_img
         self.dataset_folder = dataset_folder
         self.transform = transform
         self.data = []
@@ -37,7 +38,7 @@ class TrackJerseyNumberDataset(Dataset):
         
         dirs = [dir_name for dir_name in os.listdir(dataset_folder) if "SNGS" in dir_name]
         
-        for dir_name in tqdm(dirs, desc="Processing games", total=len(dirs)):
+        for dir_name in tqdm(dirs, desc="Loading TrackJerseyNumberDataset", total=len(dirs)):
             json_file_path = os.path.join(dataset_folder, dir_name, "Labels-GameState.json")
             img_folder = os.path.join(dataset_folder, dir_name, "img1")
             if os.path.exists(json_file_path) and os.path.exists(img_folder):
@@ -56,7 +57,7 @@ class TrackJerseyNumberDataset(Dataset):
                                     jersey_number = 0
                                 track = Track(
                                     track_id=track_id,
-                                    jersey=jersey_number,
+                                    jersey=int(jersey_number),
                                     role_id=annotation["attributes"]["role"],
                                     video=dir_name,
                                     bboxes=[]
@@ -102,17 +103,18 @@ class TrackJerseyNumberDataset(Dataset):
             
         
         cropped_images = []
-        for bbox in track.bboxes:
-            image_id = bbox.image_id
-            image = self.cache["images"].get(image_id)
-            if image is None:
-                # This should not happen, all images should be in the cache
-                image_path = os.path.join(self.dataset_folder, track.video, "img1", bbox.image_filename)
-                image = Image.open(image_path)
-            cropped_image = image.crop((bbox.x, bbox.y, bbox.x + bbox.w, bbox.y + bbox.h))
-            if self.transform:
-                cropped_image = self.transform(cropped_image)
-            cropped_images.append(cropped_image)
+        if self.return_img:
+            for bbox in track.bboxes:
+                image_id = bbox.image_id
+                image = self.cache["images"].get(image_id)
+                if image is None:
+                    # This should not happen, all images should be in the cache
+                    image_path = os.path.join(self.dataset_folder, track.video, "img1", bbox.image_filename)
+                    image = Image.open(image_path)
+                cropped_image = image.crop((bbox.x, bbox.y, bbox.x + bbox.w, bbox.y + bbox.h))
+                if self.transform:
+                    cropped_image = self.transform(cropped_image)
+                cropped_images.append(cropped_image)
         return track, cropped_images
     
     
