@@ -10,6 +10,8 @@ from real_clusters_dataset import read_track_clustering_file, RealClustersDatase
 from cluster_classification_dataset import ClusterScenario, get_tracks, Track
 from cluster_feats import ClusterFeats
 
+from gsr.utils.neptune_logger import NeptuneLogger
+
 @dataclass
 class ClassifiedTrack:
     track_id: int
@@ -18,9 +20,9 @@ class ClassifiedTrack:
 
 # Runs the whole cluster classification pipeline
 class ClusterPredictionModel():
-    def __init__(self, prediction_model):
+    def __init__(self, prediction_model, neptune_logger: NeptuneLogger):
         self.prediction_model = prediction_model
-        self.cluster_feats = ClusterFeats()
+        self.cluster_feats = ClusterFeats(neptune_logger)
         
     # Predicts most likely role_id for the cluster, but ruling out a invalid clustering
     def predict_cluster_label(self, cluster_tracks : List[Track], rest_tracks: List[Track]) -> float:
@@ -57,13 +59,23 @@ def predict_cluster_class(cluster: TrackCluster, model, video_tracks: List[Track
     return pred_cluster_class
     
 
-def eval_clustering_confidence(clustering: TrackClustering, model) -> float:
+def eval_clustering_confidence(clustering: TrackClustering, model, neptune_logger: NeptuneLogger) -> float:
     video_tracks: List[Track] = clustering.gt_tracks
     clustering_valid_scores = [predict_cluster_valid_score(cluster, model, video_tracks) for cluster in clustering.clusters]
+    
     # All have to be valid
-    clustering_score = reduce(operator.mul, clustering_valid_scores , 1)
+    # clustering_score = reduce(operator.mul, clustering_valid_scores , 1)
+    # neptune_logger.log(f"evaluation/clustering_score_method", "product")
+    
     # Mean of being valid
     # clustering_score = np.mean(clustering_valid_scores)
+    # neptune_logger.log(f"evaluation/clustering_score_method", "mean")
+    
+    # Weighted mean of being valid
+    clustering_valid_scores = [len(cluster.track_ids) * predict_cluster_valid_score(cluster, model, video_tracks) for cluster in clustering.clusters]
+    total_cluster_size = sum(len(cluster.track_ids) for cluster in clustering.clusters)
+    clustering_score = np.sum(clustering_valid_scores) / total_cluster_size
+    neptune_logger.log(f"evaluation/clustering_score_method", "weigh")
     return clustering_score
 
 def cluster_to_tracks(clustering: TrackClustering, model) -> List[ClassifiedTrack]:
@@ -108,6 +120,11 @@ class VideoMetrics:
     best_track_accuracy: float
     best_bbox_accuracy: float
     is_clustering_correct: bool
+    
+    def __str__(self):
+        return f'VideoMetrics(\n    video={self.video}, \n    track_accuracy={self.track_accuracy}, \n    bbox_accuracy={self.bbox_accuracy}, \n    best_track_accuracy={self.best_track_accuracy}, \n    best_bbox_accuracy={self.best_bbox_accuracy}, \n    is_clustering_correct={self.is_clustering_correct} \n)'
+    def __repr__(self):
+        return self.__str__()
 
 @dataclass
 class ClusteringEvaluationMetrics:
@@ -120,8 +137,8 @@ class ClusteringEvaluationMetrics:
 
 # Given a ClusteringDataset, runs a model to find which is the best clustering on each scenario, and classifies clusters
 # Then compares found role_ids vs ground trutth annotations of tracks
-def evaluate_clustering(clustering_dataset: RealClustersDataset, prediction_model) -> ClusteringEvaluationMetrics:
-    model = ClusterPredictionModel(prediction_model)
+def evaluate_clustering(clustering_dataset: RealClustersDataset, prediction_model, neptune_logger: NeptuneLogger) -> ClusteringEvaluationMetrics:
+    model = ClusterPredictionModel(prediction_model, neptune_logger)
     
     clustering: List[TrackClustering] = clustering_dataset.get_clusterings()
     videos_list = np.unique([c.video for c in clustering])
@@ -133,7 +150,7 @@ def evaluate_clustering(clustering_dataset: RealClustersDataset, prediction_mode
     
     for video in tqdm(videos_list, total=len(videos_list), desc='Iterating over videos'):
         video_clusterings: List[TrackClustering] = [c for c in clustering if c.video == video]
-        clustering_confidences = [eval_clustering_confidence(c, model) for c in video_clusterings]
+        clustering_confidences = [eval_clustering_confidence(c, model, neptune_logger) for c in video_clusterings]
         
         best_clustering: TrackClustering = video_clusterings[clustering_confidences.index(max(clustering_confidences))]
         true_clustering = next((c for c in video_clusterings if c.is_valid))
