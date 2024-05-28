@@ -16,6 +16,8 @@ from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, accuracy_score, precision_score, recall_score
 
+from gsr.utils.neptune_logger import NeptuneLogger
+
 @dataclass
 class DatasetConfiguration:
     # Paths to take GroundTruth Datasets. These are used to generate SynthDatasets
@@ -79,7 +81,7 @@ class DatasetRegistry:
         valid_datasets = [(dataset, self.registry[dataset]) for dataset in self.conf.valid_datasets]
         return valid_datasets        
       
-def evaluate_model(model_instance, dataset_name: str, dataset: Dataset):
+def evaluate_model(model_instance, dataset_name: str, dataset: Dataset, neptune_logger: NeptuneLogger):
     X = []
     y = []
     for data in tqdm(dataset, total=len(dataset), desc=f'Iterating over {dataset_name} dataset'):
@@ -109,13 +111,15 @@ def evaluate_model(model_instance, dataset_name: str, dataset: Dataset):
     # axs.set_title(f'Model on Dataset {dataset_name} (acc: {accuracy})')
     # plt.show()
 
-    print(f"{dataset_name} - accuracy:", accuracy)
-    print(f"{dataset_name} - precision:", precision)
-    print(f"{dataset_name} - recall:", recall)
+    # print(f"{dataset_name} - accuracy:", accuracy)
+    # print(f"{dataset_name} - precision:", precision)
+    # print(f"{dataset_name} - recall:", recall)
+    neptune_logger.log(f"evaluation/{dataset_name}/accuracy", accuracy)
+    neptune_logger.log(f"evaluation/{dataset_name}/precision", precision)
+    neptune_logger.log(f"evaluation/{dataset_name}/recall", recall)
 
 
-
-def run_model(model: str, store_model: str, train_dataset: Dataset, valid_dataset: List[Tuple[str, Dataset]], 
+def run_model(model: str, neptune_logger: NeptuneLogger, store_model: str, train_dataset: Dataset, valid_dataset: List[Tuple[str, Dataset]], 
                                                                                         
               cluster_feats: ClusterFeats, rf_n_estimators: int=100, rf_max_depth: int=None, rf_criterion: str="gini",
               xgb_n_estimators: int=6, xgb_max_depth: int=2, xgb_learning_rate: float=1,
@@ -155,22 +159,37 @@ def run_model(model: str, store_model: str, train_dataset: Dataset, valid_datase
     
     # Evaluate
     for dataset_name, dataset in valid_dataset:
-        evaluate_model(model_instance, dataset_name, dataset)
+        evaluate_model(model_instance, dataset_name, dataset, neptune_logger)
         if isinstance(dataset, RealClustersDataset):
-            track_metrics = evaluate_clustering(dataset, model_instance)
-            print(f"///// Evaluation Clustering on {dataset_name}")
-            print(f"% of videos with correct clustering found: {track_metrics.percent_correct_clustering:.2f}%")
-            print(f"Average Track role_id Accuracy {track_metrics.average_track_accuracy * 100:.2f}")
-            print(f"Average Bbox role_id Accuracy {track_metrics.average_bbox_accuracy * 100:.2f}")
-            print(f"True Clustering Track role_id Accuracy {track_metrics.average_best_track_accuracy * 100:.2f}")
-            print(f"True Clustering Average Bbox role_id Accuracy {track_metrics.average_best_bbox_accuracy * 100:.2f}")
+            track_metrics = evaluate_clustering(dataset, model_instance, neptune_logger)
+            neptune_logger.log(f"evaluation/{dataset_name}/percent_correct_clustering",
+                               track_metrics.percent_correct_clustering)
+            neptune_logger.log(f"evaluation/{dataset_name}/average_track_accuracy",
+                               track_metrics.average_track_accuracy * 100)
+            neptune_logger.log(f"evaluation/{dataset_name}/average_bbox_accuracy",
+                               track_metrics.average_bbox_accuracy * 100)
+            neptune_logger.log(f"evaluation/{dataset_name}/average_best_track_accuracy",
+                               track_metrics.average_best_track_accuracy * 100)
+            neptune_logger.log(f"evaluation/{dataset_name}/average_best_bbox_accuracy",
+                               track_metrics.average_best_bbox_accuracy * 100)
+            # print("///////////////////////////////////////////////////////////////////////////")
+            # print(f'{dataset_name} metrics:')
+            # print("\n")
+            # for metrics in track_metrics.video_metrics:
+            #     print(metrics)
+            #     print("\n")
+            # print("///////////////////////////////////////////////////////////////////////////")
+            # print(f"///// Evaluation Clustering on {dataset_name}")
+            # print(f"% of videos with correct clustering found: {track_metrics.percent_correct_clustering:.2f}%")
+            # print(f"Average Track role_id Accuracy {track_metrics.average_track_accuracy * 100:.2f}")
+            # print(f"Average Bbox role_id Accuracy {track_metrics.average_bbox_accuracy * 100:.2f}")
+            # print(f"True Clustering Track role_id Accuracy {track_metrics.average_best_track_accuracy * 100:.2f}")
+            # print(f"True Clustering Average Bbox role_id Accuracy {track_metrics.average_best_bbox_accuracy * 100:.2f}")
 
     # Save model
     if store_model is not None:
         joblib.dump(model_instance, store_model)
         print(f"Saved model to {store_model}")
-        
-    
 
 
 if __name__ == "__main__":
@@ -234,8 +253,18 @@ if __name__ == "__main__":
         default=None,
         help="Path to a json with RealClustering for Test Dataset",
     )                                                                                    
-    parser.add_argument("--train_datasets", nargs="+", type=str, help="List of training datasets")
-    parser.add_argument("--valid_datasets", nargs="+", type=str, help="List of valid datasets")
+    parser.add_argument(
+        "--train_datasets",
+        nargs="+",
+        type=str,
+        help="List of training datasets"
+    )
+    parser.add_argument(
+        "--valid_datasets",
+        nargs="+",
+        type=str,
+        help="List of valid datasets"
+    )
     parser.add_argument(
         "--homogeneity_threshold",
         type=float,
@@ -306,6 +335,26 @@ if __name__ == "__main__":
         default=None,
         help="Path to store trained model",
     )
+    parser.add_argument(
+        "--neptune",
+        required=False,
+        action="store_true",
+        default=False,
+        help="Log experiment results to neptune"
+    )
+    parser.add_argument(
+        "--project",
+        required=False,
+        type=str,
+        default="eidos/GameStateChallenge",
+        help="The name of the project"
+    )
+    parser.add_argument(
+        "--name",
+        required=False,
+        type=str,
+        help="The name of the experiment"
+    )
 
     args = vars(parser.parse_args())
 
@@ -330,14 +379,14 @@ if __name__ == "__main__":
     rf_max_depth = args["rf_max_depth"]
     rf_criterion = args["rf_criterion"]
 
-    # xgboost hyper parameters xgb_
+    # xgboost hyper parameters xgboost
     xgb_n_estimators = args["xgb_n_estimators"]
     xgb_max_depth = args["xgb_max_depth"]
     xgb_learning_rate = args["xgb_learning_rate"]
     xgb_objective = args["xgb_objective"]
+
     store_model = args["store_model"]
-
-
+    
     # instanciate datasets
     data_conf = DatasetConfiguration(
         train_data_path, valid_data_path,test_data_path,
@@ -347,12 +396,56 @@ if __name__ == "__main__":
         train_datasets, valid_datasets
     )
     
+    # add parameters to neptune
+    neptune_logger = NeptuneLogger(enable_run=args["neptune"], project=args["project"], run_name_or_id=args["name"])
+    neptune_logger.tags(["ClusterClassification"])
+
+    neptune_logger.param("model/method", model)
+    neptune_logger.param("valid_real_cluster_path", valid_real_cluster_path)
+    neptune_logger.param("test_real_cluster_path", test_real_cluster_path)
+    neptune_logger.param("train_datasets/datasets", str(train_datasets))
+    neptune_logger.param("valid_datasets/datasets", str(valid_datasets))
+
+    if "synth_train" in train_datasets:
+        neptune_logger.param("train_datasets/synth_train/homogeneity_threshold", homogeneity_threshold)
+        neptune_logger.param("train_datasets/synth_train/scenarios_per_video", scenarios_per_video)
+    if "synth_train" in valid_datasets:
+        neptune_logger.param("valid_datasets/synth_train/homogeneity_threshold", homogeneity_threshold)
+        neptune_logger.param("valid_datasets/synth_train/scenarios_per_video", scenarios_per_video)
+        
+    if "synth_valid" in train_datasets:
+        neptune_logger.param("train_datasets/synth_valid/homogeneity_threshold", homogeneity_threshold)
+        neptune_logger.param("train_datasets/synth_valid/scenarios_per_video", scenarios_per_video)
+    if "synth_valid" in valid_datasets:
+        neptune_logger.param("valid_datasets/synth_valid/homogeneity_threshold", homogeneity_threshold)
+        neptune_logger.param("valid_datasets/synth_valid/scenarios_per_video", scenarios_per_video)
+        
+    if "synth_test" in train_datasets:
+        neptune_logger.param("train_datasets/synth_test/homogeneity_threshold", homogeneity_threshold)
+        neptune_logger.param("train_datasets/synth_test/scenarios_per_video", scenarios_per_video)
+    if "synth_test" in valid_datasets:
+        neptune_logger.param("valid_datasets/synth_test/homogeneity_threshold", homogeneity_threshold)
+        neptune_logger.param("valid_datasets/synth_test/scenarios_per_video", scenarios_per_video)
+        
+    if model == "random_forest":
+        neptune_logger.param("model/n_estimators", rf_n_estimators)
+        if rf_max_depth is None:
+            neptune_logger.param("model/max_depth", "None (default)")
+        else:
+            neptune_logger.param("model/max_depth", rf_max_depth)
+        neptune_logger.param("model/criterion", rf_criterion)
+    elif model == "xgboost":
+        neptune_logger.param("model/n_estimators", xgb_n_estimators)
+        neptune_logger.param("model/max_depth", xgb_max_depth)
+        neptune_logger.param("model/learning_rate", xgb_learning_rate)
+        neptune_logger.param("model/objective", xgb_objective)
+
     data_registry = DatasetRegistry(data_conf)
     train_datasets = data_registry.get_train_dataset()
     valid_dataset = data_registry.get_valid_dataset()
-
+    
     # instanciate feats extractor
     cluster_feats = ClusterFeats()
 
     # execute script's main function
-    run_model(model, store_model, train_datasets, valid_dataset, cluster_feats, rf_n_estimators, rf_max_depth, rf_criterion, xgb_n_estimators, xgb_max_depth, xgb_learning_rate, xgb_objective)
+    run_model(model, neptune_logger, store_model, train_datasets, valid_dataset, cluster_feats, rf_n_estimators, rf_max_depth, rf_criterion, xgb_n_estimators, xgb_max_depth, xgb_learning_rate, xgb_objective)
