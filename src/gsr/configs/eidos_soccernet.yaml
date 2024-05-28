@@ -21,6 +21,7 @@ defaults:
   - modules/pitch : tvcalib
   - modules/calibration: tvcalib
   - modules/role_embeddings: role_embeddings
+  - modules/role_classification: role_classification
   - _self_
 
 # Pipeline definition :
