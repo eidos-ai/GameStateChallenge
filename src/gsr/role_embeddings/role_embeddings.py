@@ -25,7 +25,7 @@ TRANSFORM = transforms.Compose([
 
 class RoleEmbeddings(DetectionLevelModule):
     input_columns = []
-    output_columns = ["bbox_role_id"]
+    output_columns = ["role_embeddings"]
     collate_fn = default_collate
 
     def __init__(self, cfg, device, batch_size, tracking_dataset=None):
@@ -34,7 +34,7 @@ class RoleEmbeddings(DetectionLevelModule):
         self.model = ResnetMLP(
             resnet_model="resnet18",
             mlp_hidden_layers=[],
-            mlp_output_size=2,
+            mlp_output_size=64,
         )
         self.model.load_state_dict(torch.load(self.cfg.model_path))
         self.model.to(self.cfg.device)
