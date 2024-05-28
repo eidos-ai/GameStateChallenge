@@ -30,7 +30,6 @@ class CNNFusion(pl.LightningModule):
         self.fc3 = nn.Linear(256, 101)
         
     def forward(self, x):
-        print(x.device)
         # logging.info(f"Model Input x {x.shape}")
         # print(f"input size : {x.size()}")
         # x size (1, 101)

@@ -19,6 +19,7 @@ import numpy as np
 from PIL import Image
 
 from models.convnext import ConvNext
+from models.diemodel import DieModel
 from dataloader import JerseyNumberDataset
 from svhn_dataloader import SVHNDataset
 from types import SimpleNamespace
@@ -175,6 +176,7 @@ class JerseyNumTrainer(pl.LightningModule):
         
         # First create model
         self.model = ConvNext(model_name, 100, learning_rate)
+        # self.model = DieModel(model_name, 100, learning_rate)
         
         # Load model if path given
         if model_path is not None:
@@ -197,7 +199,6 @@ class JerseyNumTrainer(pl.LightningModule):
         self.root_experiments_folder = experiments_folder
         
         self.num_classes = self.model.num_classes
-        self.confmat = ConfusionMatrix(num_classes=self.num_classes)
 
         
     def get_id(self):            
@@ -232,9 +233,9 @@ class JerseyNumTrainer(pl.LightningModule):
         _, gt_batch = batch
         pred_y_batch, loss = self._common_step(batch, batch_idx)
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        
+
+        # print(gt_batch)
         pred_labels = self.model.pred_to_label(pred_y_batch)
-        self.confmat.update(pred_labels, gt_batch)
         
         accuracy = torch.sum(pred_labels == gt_batch) / float(gt_batch.size(0))
         self.log('train_accuracy', accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)        
@@ -263,32 +264,9 @@ class JerseyNumTrainer(pl.LightningModule):
         
     def on_validation_epoch_end(self):
         self.save_model()
-        # Log accuracy for each label
-        acc_per_class = self.confmat.compute().diag() / self.confmat.compute().sum(1)
-        for i, acc in enumerate(acc_per_class):
-            self.log(f'test/val_accuracy_label_{i}', acc.item())
-        
-        self.create_conf_matrix()
-        self.confmat.reset()
-
         
     def configure_optimizers(self):
         return self.model.configure_optimizers()
-    
-    def create_conf_matrix(self):
-        # Create and log the confusion matrix image
-        fig, ax = plt.subplots()
-        mat = self.confmat.compute().cpu().numpy()
-        cax = ax.matshow(mat, cmap='viridis')
-        fig.colorbar(cax)
-        plt.xlabel('Predicted Labels')
-        plt.ylabel('True Labels')
-        plt.title('Confusion Matrix')
-        save_folder = Path(self.experiment_folder, "plots")
-        save_folder.mkdir(exist_ok=True, parents=True)
-        save_path = Path(save_folder, f"{self.current_epoch}.png")
-        plt.savefig(save_path)
-        plt.close(fig)
         
 def train(train_datasetpath, valid_datasetpath, test_datasetpath, svhn_datasetpath, train_datasets, valid_datasets, epochs, batch_size, model_path, model_name = "convnextv2_nano.fcmae_ft_in1k"):    
 

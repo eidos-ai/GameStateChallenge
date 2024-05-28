@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader, Dataset
 import torch
 import pytorch_lightning as pl
 import random
+import math
 
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as F
@@ -18,6 +19,8 @@ from PIL import Image
 from detections_dataset import TrackDetectionsDataset
 from models.cnnfusion import CNNFusion
 from models.transfusion import TransFusion
+from models.samplefusion import SampleFusion
+from models.lstm import SampleLSTM
 
 @dataclass
 class DatasetConfiguration:
@@ -28,6 +31,7 @@ class DatasetConfiguration:
     saved_detections_test_path: str
     train_datasets: List[str]
     valid_datasets: List[str]
+    n_samples: int
 
     def asdict(self):
         return {
@@ -46,15 +50,15 @@ class DatasetRegistry():
         self.conf = conf
         
         # self.soccernet_train_dataset = TrackDetectionsDataset(conf.soccernet_train_path)
-        self.soccernet_test_dataset = TrackDetectionsDataset(conf.soccernet_test_path, conf.saved_detections_test_path)
-        self.soccernet_val_dataset = TrackDetectionsDataset(conf.soccernet_valid_path, conf.saved_detections_valid_path)
+        self.soccernet_test_dataset = TrackDetectionsDataset(conf.soccernet_test_path, conf.saved_detections_test_path, conf.n_samples, augment= "soccernet_test" in conf.train_datasets)
+        self.soccernet_val_dataset = TrackDetectionsDataset(conf.soccernet_valid_path, conf.saved_detections_valid_path, conf.n_samples, augment= "soccernet_valid" in conf.train_datasets)
         
         self.registry = {
             # 'soccernet_train': self.soccernet_train_dataset,        
             'soccernet_test': self.soccernet_test_dataset,      
             'soccernet_valid': self.soccernet_val_dataset
         }
-        
+
     def get_train_dataset(self):
         train_datasets = ConcatDataset([self.registry[dataset] for dataset in self.conf.train_datasets])
         return train_datasets
@@ -64,24 +68,27 @@ class DatasetRegistry():
         return valid_datasets        
 
 class TrackSolverTrainer(pl.LightningModule):
-    def __init__(self, data_conf: DatasetConfiguration, experiments_folder, batch_size = 32, learning_rate = 1e-4):       
+    def __init__(self, data_conf: DatasetConfiguration, experiments_folder, model_arch, batch_size = 32, hidden_size=128, num_layers=2, learning_rate = 1e-4):       
         super().__init__()
         self.save_hyperparameters()
         self.batch_size = batch_size
         self.data_conf = data_conf
 
         # Load Model
-        self.model = CNNFusion(learning_rate)
-
-        self.model = TransFusion(
-            learning_rate,
-            num_layers=2,
-            d_model=256,
-            num_heads=4,
-            d_ff=1024,
-            input_dim=100,
-            output_dim=100,
-            max_length=20)
+        if model_arch == "SampleLSTM":
+            self.model = SampleLSTM(learning_rate, hidden_size, num_layers)
+        elif model_arch == "SampleFusion":
+            self.model = SampleFusion(
+                learning_rate,
+                num_layers=num_layers,
+                d_model=hidden_size,
+                num_heads=2,
+                d_ff=128,
+                input_dim=200,
+                output_dim=100,
+                max_length=15)
+        else:
+            raise Exception("Model not found")
 
 
         
@@ -97,6 +104,7 @@ class TrackSolverTrainer(pl.LightningModule):
         
         self.experiment_id = None
         self.root_experiments_folder = experiments_folder
+        self.asd = 0
 
     def get_id(self):            
         return self.experiment_id
@@ -124,6 +132,8 @@ class TrackSolverTrainer(pl.LightningModule):
         loss = self.model.loss(pred_y_batch, gt_batch)
         # print("pred", pred_y_batch)
         # print("gt_batch", gt_batch)
+        if math.isnan(loss):
+            raise Exception
         return pred_y_batch, loss
 
     
@@ -168,7 +178,7 @@ class TrackSolverTrainer(pl.LightningModule):
         return self.model.configure_optimizers()
 
 
-def train(train_datasetpath, valid_datasetpath, test_datasetpath, saved_detections_valid, saved_detections_test, train_datasets, valid_datasets, epochs, batch_size):   
+def train(train_datasetpath, valid_datasetpath, test_datasetpath, saved_detections_valid, saved_detections_test, train_datasets, valid_datasets, n_samples, epochs, batch_size, model_arch, hidden_size, num_layers):   
     data_configuration = DatasetConfiguration(        
         soccernet_train_path = train_datasetpath,
         soccernet_test_path = test_datasetpath,
@@ -176,10 +186,11 @@ def train(train_datasetpath, valid_datasetpath, test_datasetpath, saved_detectio
         saved_detections_valid_path=saved_detections_valid,
         saved_detections_test_path=saved_detections_test,
         train_datasets = train_datasets,
-        valid_datasets = valid_datasets        
+        valid_datasets = valid_datasets,
+        n_samples=n_samples
     )
     experiments_folder = "../../experiments/track_solver"
-    in_trainer = TrackSolverTrainer(data_configuration, experiments_folder=experiments_folder, batch_size=batch_size)
+    in_trainer = TrackSolverTrainer(data_configuration, experiments_folder=experiments_folder, batch_size=batch_size, model_arch=model_arch, hidden_size=hidden_size, num_layers=num_layers)
     
     
     neptune_logger = NeptuneLogger(  # replace with your own
@@ -210,9 +221,13 @@ if __name__ == "__main__":
     parser.add_argument("--train_datasets", nargs="+", type=str, help="List of training datasets")
     parser.add_argument("--valid_datasets", nargs="+", type=str, help="List of valid datasets")
 
-    parser.add_argument('-ep', '--epochs', type=int, default=200, required=False, help='Number of epochs for training')
+    parser.add_argument('-ep', '--epochs', type=int, default=1000, required=False, help='Number of epochs for training')
     parser.add_argument('-tb', '--batch_size', type=int, default=32, required=False, help='Batch size')
-
+    
+    parser.add_argument('-m', '--model', type=str, default='SampleLSTM', choices=['SampleLSTM', 'SampleFusion'], required=False, help='Model Architecture name')
+    parser.add_argument('-s', '--samples', type=int, default=15, required=False, help='How many samples of the track')
+    parser.add_argument('-hi', '--hidden', type=int, default=128, required=False, help='Hidden size')
+    parser.add_argument('-l', '--num_layers', type=int, default=2, required=False, help='Num Layers')
     args = vars(parser.parse_args())
 
     if not os.path.exists(args['train']):
@@ -228,5 +243,7 @@ if __name__ == "__main__":
     train(args['train'], args['val'], args['test'],
           args['saved_valid'], args['saved_test'],
           args['train_datasets'], args['valid_datasets'],
-          epochs = args['epochs'], 
-          batch_size = args['batch_size'])
+          args['samples'],
+          epochs = args['epochs'], batch_size = args['batch_size'],
+          model_arch = args['model'],
+          hidden_size = args['hidden'], num_layers= args['num_layers'])

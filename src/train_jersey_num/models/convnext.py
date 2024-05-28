@@ -58,7 +58,21 @@ class ConvNext(pl.LightningModule):
                 transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
             ])
         else:
-            transform = timm.data.create_transform(**self.data_config, is_training=is_training)
+            # transform = transforms.Compose([
+            #     # transforms.Lambda(lambda img: letterbox_image(img, 256)),
+            #     transforms.RandomResizedCrop(size=(224, 224), scale=(0.08, 1.0), ratio=(0.75, 1.333), interpolation=transforms.InterpolationMode.BICUBIC),
+            #     transforms.RandomHorizontalFlip(p=0.5),
+            #     transforms.ColorJitter(brightness=[0.6, 1.4], contrast=[0.6, 1.4], saturation=[0.6, 1.4]),
+        
+            #     # transforms.RandomResizedCrop(size=(224, 224), scale=(0.3, 1.0), ratio=(0.2, 1.333), interpolation=transforms.InterpolationMode.BICUBIC),
+            #     # transforms.ColorJitter(brightness=0.5, contrast=1, saturation=1, hue=0.3),
+            #     # transforms.RandomRotation(degrees=30),
+            #     # transforms.RandomPerspective(distortion_scale=0.5, p=0.5, interpolation=3),
+            #     # transforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5)),
+            #     transforms.ToTensor(),
+            #     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            # ])
+            transform = self.train_transform
         return transform
         
 

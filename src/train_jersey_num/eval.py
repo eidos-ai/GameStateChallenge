@@ -27,7 +27,6 @@ from PIL import Image
 
 from models.convnext import ConvNext
 from dataloader import JerseyNumberDataset
-from svhn_dataloader import SVHNDataset
 from types import SimpleNamespace
 
 BATCH_SIZE = 8 
@@ -101,7 +100,7 @@ def remove_all(folder):
         else:
             os.remove(path)
         
-def eval(train_datasetpath, valid_datasetpath, test_datasetpath, svhn_datasetpath, model_path, model_name = "convnextv2_nano.fcmae_ft_in1k"):    
+def eval(train_datasetpath, valid_datasetpath, test_datasetpath, model_path, model_name = "convnextv2_nano.fcmae_ft_in1k"):    
     device = "cuda"
     
     model = ConvNext(model_name, 100, 1e-4)
@@ -151,7 +150,6 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--train', default="../../data/jersey_num/train", required=False, help='Path to directory with JerseyDataset train split')
     parser.add_argument('-v', '--val', default="../../data/jersey_num/valid", required=False, help='Path to directory with JerseyDataset val split')
     parser.add_argument('-te', '--test', default="../../data/jersey_num/test", required=False, help='Path to directory with JerseyDataset test split')
-    parser.add_argument('--svhn', default="../../data/svhn", required=False, help='Path to directory with SVHN test split')
     
     
     parser.add_argument('-m', '--model_name', type=str, default="convnextv2_nano.fcmae_ft_in1k", required=False, help='ConNext Model to use')
@@ -169,6 +167,6 @@ if __name__ == "__main__":
         exit(1)
 
     
-    eval(args['train'], args['val'], args['test'], args['svhn'],         
+    eval(args['train'], args['val'], args['test'],         
           model_name = args['model_name'],
           model_path = args['model_path'])
