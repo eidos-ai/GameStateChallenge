@@ -41,7 +41,8 @@ class DatasetConfiguration:
             'saved_detections_valid': self.saved_detections_valid_path,
             'saved_detections_test': self.saved_detections_test_path,
             'train_datasets': ','.join(self.train_datasets),
-            'valid_datasets': ','.join(self.valid_datasets)
+            'valid_datasets': ','.join(self.valid_datasets),
+            'n_samples': self.n_samples
         }
 
 
@@ -200,9 +201,10 @@ def train(train_datasetpath, valid_datasetpath, test_datasetpath, saved_detectio
 
     trainer = pl.Trainer(
         max_epochs=epochs,
-        log_every_n_steps=10,
+        log_every_n_steps=200,
         logger = neptune_logger,
-        enable_checkpointing=False
+        enable_checkpointing=False,
+        check_val_every_n_epoch=50
     )
     
     # Train the Trainer
@@ -221,7 +223,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_datasets", nargs="+", type=str, help="List of training datasets")
     parser.add_argument("--valid_datasets", nargs="+", type=str, help="List of valid datasets")
 
-    parser.add_argument('-ep', '--epochs', type=int, default=1000, required=False, help='Number of epochs for training')
+    parser.add_argument('-ep', '--epochs', type=int, default=2000, required=False, help='Number of epochs for training')
     parser.add_argument('-tb', '--batch_size', type=int, default=32, required=False, help='Batch size')
     
     parser.add_argument('-m', '--model', type=str, default='SampleLSTM', choices=['SampleLSTM', 'SampleFusion'], required=False, help='Model Architecture name')
