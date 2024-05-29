@@ -1,0 +1,5 @@
+_target_: gsr.role_embeddings.role_embeddings.RoleEmbeddings
+batch_size: 16
+cfg:
+  device: "cuda"
+  model_path: "${model_dir}/role_embeddings/GAM226-epoch1.pt"
