@@ -135,8 +135,14 @@ def get_video_tracks(detections: pd.DataFrame) -> List[Track]:
         bbox_y_image = detections["bbox_ltwh"].iloc[i][1]
         bbox_w_image = detections["bbox_ltwh"].iloc[i][2]
         bbox_h_image = detections["bbox_ltwh"].iloc[i][3]
-        bbox_x_pitch = detections["bbox_pitch"].iloc[i]["x_bottom_middle"]
-        bbox_y_pitch = detections["bbox_pitch"].iloc[i]["y_bottom_middle"]
+        bbox_x_pitch = None
+        bbox_y_pitch = None
+        try:
+            bbox_x_pitch = detections["bbox_pitch"].iloc[i]["x_bottom_middle"]
+            bbox_y_pitch = detections["bbox_pitch"].iloc[i]["y_bottom_middle"]
+        except TypeError:
+            bbox_x_pitch = detections["bbox_pitch"].iloc[i]
+            bbox_y_pitch = detections["bbox_pitch"].iloc[i]
         bbox = BBox(frame=bbox_frame ,x_image=bbox_x_image, y_image=bbox_y_image, w_image=bbox_w_image, h_image=bbox_h_image, x_pitch=bbox_x_pitch, y_pitch=bbox_y_pitch)
         bboxes_per_track_id[detections["track_id"].iloc[i]].append(bbox)
     for track_id, track_bboxes in bboxes_per_track_id.items():
@@ -203,7 +209,7 @@ class RoleClassification(VideoLevelModule):
         track_predictions = cluster_to_tracks(best_clustering, self.model) # List[ClassifiedTrack(track_id, pred_role_id]
 
         print("///////")
-        print(best_clustering)
+        print(best_clustering.clusters)
         print("///////")
         print([classified_track.pred_role_id for classified_track in track_predictions])
         print("///////")
@@ -219,9 +225,32 @@ class RoleClassification(VideoLevelModule):
                 detections.at[idx, 'team_cluster'] = team_cluster
                 detections.at[idx, 'team'] = side
 
-        print("///////")
-        print(detections.info())
-        print("///////")
-        print(detections.head(150))
-        print("///////")
+        player_detections = detections[detections['role'] == 'player']
+        role_embeddings = player_detections['role_embeddings'].tolist()
+        kmeans = KMeans(n_clusters=2, random_state=0).fit(role_embeddings)
+        player_detections['team_cluster'] = kmeans.labels_
+
+        # mapeo track_id con el equipo al que es asignado más veces
+        track_ids = detections["track_id"].tolist()
+        tracks_predictions = defaultdict(list) # creo un dict {track_id: most_predicted_cluster_id}
+        for track_idx, track_id in enumerate(track_ids):
+            if np.isnan(track_id):
+                continue
+            temp_track_predictions: List[int] = []
+            for pred_idx, prediction in enumerate(player_detections['team_cluster']):
+                if track_ids[pred_idx] == track_id:
+                    temp_track_predictions.append(prediction)
+            tracks_predictions[track_id] = Counter(temp_track_predictions).most_common(1)[0][0]
+
+        print(tracks_predictions)
+
+        # itero en el df y cuando aparece un track_id, le asigno el team y team_cluster de ese track_id
+        for det_idx, det_row in detections.iterrows():
+            if det_row['track_id'] in tracks_predictions:
+                detections.at[det_idx, 'team_cluster'] = tracks_predictions[det_row['track_id']]
+                if tracks_predictions[det_row['track_id']] == 0:
+                    detections.at[idx, 'team'] = 'left'
+                else:
+                    detections.at[idx, 'team'] = 'right'
+
         return detections
