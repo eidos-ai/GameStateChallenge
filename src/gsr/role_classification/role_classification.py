@@ -19,19 +19,19 @@ from gsr.cluster_feats import ClusterFeats, Track, BBox
 
 def get_role_and_team(pred_role_id: int):
     if pred_role_id == 0: # player_left
-        return "player", 0
+        return "player", 0, "left"
     elif pred_role_id == 1: # player_right
-        return "player", 1
+        return "player", 1, "right"
     elif pred_role_id == 2: # goalkeeper_left
-        return "goalkeeper", -1
+        return "goalkeeper", None, "left"
     elif pred_role_id == 3: # goalkeeper_right
-        return "goalkeeper", -1
+        return "goalkeeper", None, "right"
     elif pred_role_id == 4: # referee
-        return "referee", -1
+        return "referee", None, None
     elif pred_role_id == 5: # other
-        return "other", -1
+        return "other", None, None
     else:
-        return "player", 1
+        return "player", 1, "right"
 
 @dataclass
 class ClassifiedTrack:
@@ -118,28 +118,6 @@ def cluster_to_tracks(clustering: TrackClustering, model) -> List[ClassifiedTrac
             ))
     return classified_tracks
 
-def evaluate_track_accuracy(pred_tracks: List[ClassifiedTrack], video_tracks: List[Track] ) -> float:
-     # Create a map from track_id to role_id for ground truth tracks
-    video_track_map = {track.track_id: track for track in video_tracks}
-
-    correct_tracks = 0
-    correct_bboxes = 0
-
-    # Evaluate each predicted track
-    for pred_track in pred_tracks:
-        if pred_track.track_id in video_track_map and pred_track.pred_role_id == video_track_map[pred_track.track_id].role_id:
-            correct_tracks += 1
-            correct_bboxes += len(video_track_map[pred_track.track_id].bboxes)
-
-    # Calculate track accuracy
-    track_accuracy = correct_tracks / len(pred_tracks) if pred_tracks else 0.0
-
-    # Calculate bbox accuracy
-    total_bboxes = sum([len(track.bboxes) for track in video_tracks])
-    bbox_accuracy = correct_bboxes / total_bboxes if total_bboxes else 0.0
-
-    return track_accuracy, bbox_accuracy
-
 def generate_unique_capital_letters(length):
     if length > 26:
         raise ValueError("Length cannot be more than 26 as there are only 26 unique capital letters.")
@@ -147,28 +125,29 @@ def generate_unique_capital_letters(length):
     random.shuffle(letters)
     return letters[:length]
 
-@dataclass
-class VideoMetrics:
-    video: str
-    track_accuracy: float
-    bbox_accuracy: float
-    best_track_accuracy: float
-    best_bbox_accuracy: float
-    is_clustering_correct: bool
-
-@dataclass
-class ClusteringEvaluationMetrics:
-    average_track_accuracy: float
-    average_bbox_accuracy: float
-    average_best_track_accuracy: float
-    average_best_bbox_accuracy: float
-    percent_correct_clustering: float
-    video_metrics: List[VideoMetrics]
+def get_video_tracks(detections: pd.DataFrame) -> List[Track]:
+    video_tracks: List[Track] = []
+    bboxes_per_track_id = defaultdict(list) # {track_id: List[Bbox]}
+    for i in range(len(detections)):
+        bboxes_per_track_id[detections["track_id"].iloc[i]]
+        bbox_frame = str(detections["image_id"].iloc[i])[-6:]
+        bbox_x_image = detections["bbox_ltwh"].iloc[i][0]
+        bbox_y_image = detections["bbox_ltwh"].iloc[i][1]
+        bbox_w_image = detections["bbox_ltwh"].iloc[i][2]
+        bbox_h_image = detections["bbox_ltwh"].iloc[i][3]
+        bbox_x_pitch = detections["bbox_pitch"].iloc[i]["x_bottom_middle"]
+        bbox_y_pitch = detections["bbox_pitch"].iloc[i]["y_bottom_middle"]
+        bbox = BBox(frame=bbox_frame ,x_image=bbox_x_image, y_image=bbox_y_image, w_image=bbox_w_image, h_image=bbox_h_image, x_pitch=bbox_x_pitch, y_pitch=bbox_y_pitch)
+        bboxes_per_track_id[detections["track_id"].iloc[i]].append(bbox)
+    for track_id, track_bboxes in bboxes_per_track_id.items():
+        track = Track(track_id=track_id, bboxes=track_bboxes)
+        video_tracks.append(track)
+    return video_tracks
 
 
 class RoleClassification(VideoLevelModule):
     input_columns = ["role_embeddings", "track_id"]
-    output_columns = ["role_detection", "team_cluster"]
+    output_columns = ["role", "team_cluster", "team"]
 
     def __init__(self, cfg, **kwargs):
         super().__init__()
@@ -187,23 +166,8 @@ class RoleClassification(VideoLevelModule):
 
         track_clusterings: List[TrackClustering] = []
 
-        # get all Track instances of the video and save them in video_tracks: List[Track
-        video_tracks: List[Track] = []
-        bboxes_per_track_id = defaultdict(list) # {track_id: List[Bbox]}
-        for i in range(len(detections)):
-            bboxes_per_track_id[detections["track_id"].iloc[i]]
-            bbox_frame = str(detections["image_id"].iloc[i])[-6:]
-            bbox_x_image = detections["bbox_ltwh"].iloc[i][0]
-            bbox_y_image = detections["bbox_ltwh"].iloc[i][1]
-            bbox_w_image = detections["bbox_ltwh"].iloc[i][2]
-            bbox_h_image = detections["bbox_ltwh"].iloc[i][3]
-            bbox_x_pitch = detections["bbox_pitch"].iloc[i]["x_bottom_middle"]
-            bbox_y_pitch = detections["bbox_pitch"].iloc[i]["y_bottom_middle"]
-            bbox = BBox(frame=bbox_frame ,x_image=bbox_x_image, y_image=bbox_y_image, w_image=bbox_w_image, h_image=bbox_h_image, x_pitch=bbox_x_pitch, y_pitch=bbox_y_pitch)
-            bboxes_per_track_id[detections["track_id"].iloc[i]].append(bbox)
-        for track_id, track_bboxes in bboxes_per_track_id.items():
-            track = Track(track_id=track_id, bboxes=track_bboxes)
-            video_tracks.append(track)
+        # get all Track instances of the video and save them in video_tracks: List[Track]
+        video_tracks = get_video_tracks(detections)
 
         # use kmeans for n_clusters = [3, 4, 5, 6]
         for kmeans in kmeans_clusterings.keys():
@@ -237,7 +201,7 @@ class RoleClassification(VideoLevelModule):
         clustering_confidences = [eval_clustering_confidence(c, self.model) for c in track_clusterings]
         best_clustering: TrackClustering = track_clusterings[clustering_confidences.index(max(clustering_confidences))]
         track_predictions = cluster_to_tracks(best_clustering, self.model) # List[ClassifiedTrack(track_id, pred_role_id]
-        
+
         print("///////")
         print(best_clustering)
         print("///////")
@@ -245,14 +209,19 @@ class RoleClassification(VideoLevelModule):
         print("///////")
 
         detections['team_cluster'] = None
+        detections['team'] = None
+        detections['role'] = None
         track_id_to_pred_role_id = {ct.track_id: ct.pred_role_id for ct in track_predictions}
         for idx, row in detections.iterrows():
             if row['track_id'] in track_id_to_pred_role_id:
-                role, team_cluster = get_role_and_team(track_id_to_pred_role_id[row['track_id']])
-                detections.at[idx, 'role_detection'] = role
+                role, team_cluster, side = get_role_and_team(track_id_to_pred_role_id[row['track_id']])
+                detections.at[idx, 'role'] = role
                 detections.at[idx, 'team_cluster'] = team_cluster
-                # detections.at[idx, 'jersey_number_detection'] = 9
+                detections.at[idx, 'team'] = side
 
+        print("///////")
         print(detections.info())
+        print("///////")
         print(detections.head(150))
+        print("///////")
         return detections
