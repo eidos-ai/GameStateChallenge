@@ -17,12 +17,32 @@ from torch.utils.data import ConcatDataset
 from lightning.pytorch.loggers import NeptuneLogger
 import numpy as np
 from PIL import Image
+from PIL import ImageOps
+
 
 from models.convnext import ConvNext
 from models.diemodel import DieModel
 from dataloader import JerseyNumberDataset
 from svhn_dataloader import SVHNDataset
 from types import SimpleNamespace
+from synth_dataset import SnythNumberDataset
+
+def letterbox_image(image, output_size):
+    # Calculate padding size to maintain aspect ratio
+    width, height = image.size
+    max_dim = max(width, height)
+    padding_left = (max_dim - width) // 2
+    padding_right = max_dim - width - padding_left
+    padding_top = (max_dim - height) // 2
+    padding_bottom = max_dim - height - padding_top
+
+    # Add padding
+    image = ImageOps.expand(image, (padding_left, padding_top, padding_right, padding_bottom))
+
+    # Resize and crop
+    image = transforms.Resize(output_size, interpolation=transforms.InterpolationMode.BICUBIC)(image)
+    image = transforms.CenterCrop(output_size)(image)
+    return image
 
 @dataclass
 class DatasetConfiguration:
@@ -30,6 +50,7 @@ class DatasetConfiguration:
     jerseynum_test_path: str
     jerseynum_valid_path: str
     svhn_path: str
+    synthnum_base_path: str
     train_datasets: List[str]
     valid_datasets: List[str]
 
@@ -39,6 +60,7 @@ class DatasetConfiguration:
             'jerseynum_test_path': self.jerseynum_test_path,
             'jerseynum_valid_path': self.jerseynum_valid_path,
             'svhn_path': self.svhn_path,
+            'synthnum_base_path': self.jerseynum_train_path,
             'train_datasets': ','.join(self.train_datasets),
             'valid_datasets': ','.join(self.valid_datasets)
         }
@@ -131,6 +153,12 @@ class DatasetRegistry():
         self.jerseynum_train_dataset = JerseyNumberDataset(dataset_folder=conf.jerseynum_train_path, transform=self.get_transform('jerseynum_train'), include_number_not_seen=True)
         self.jersdeynum_test_dataset = JerseyNumberDataset(dataset_folder=conf.jerseynum_test_path, transform=self.get_transform('jerseynum_test'), include_number_not_seen=True)
         self.jersdeynum_val_dataset = JerseyNumberDataset(dataset_folder=conf.jerseynum_valid_path, transform=self.get_transform('jerseynum_valid'), include_number_not_seen=True)
+
+        synth_transform = transforms.Compose([            
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+        ])
+        self.synthnum_train = SnythNumberDataset("/home/user/GameStateChallenge/data/synth", synth_transform)
         
         # SVHN images are augmented by random increase up to 3, and random positioning
         train_svhn_transform = transforms.Compose([
@@ -151,6 +179,7 @@ class DatasetRegistry():
             'jerseynum_train': self.jerseynum_train_dataset,        
             'jerseynum_test': self.jersdeynum_test_dataset,      
             'jerseynum_valid': self.jersdeynum_val_dataset,
+            'synthnum': self.synthnum_train,
             'svhn_train': self.train_svhn,
             'svhn_test': self.test_svhn,
         }
@@ -275,6 +304,7 @@ def train(train_datasetpath, valid_datasetpath, test_datasetpath, svhn_datasetpa
         jerseynum_test_path = test_datasetpath,
         jerseynum_valid_path = valid_datasetpath,
         svhn_path = svhn_datasetpath,
+        synthnum_base_path= train_datasetpath,
         train_datasets = train_datasets,
         valid_datasets = valid_datasets        
     )
@@ -310,7 +340,7 @@ if __name__ == "__main__":
     parser.add_argument("--valid_datasets", nargs="+", type=str, help="List of valid datasets")
 
     
-    parser.add_argument('-ep', '--epochs', type=int, default=10, required=False, help='Number of epochs for training')
+    parser.add_argument('-ep', '--epochs', type=int, default=7, required=False, help='Number of epochs for training')
     parser.add_argument('-tb', '--batch_size', type=int, default=32, required=False, help='Batch size')
     parser.add_argument('-m', '--model_name', type=str, default="convnextv2_nano.fcmae_ft_in1k", required=False, help='ConNext Model to use')
     parser.add_argument('-p', '--model_path', type=str, required=False, help='Path to a pretrained model to start from')
