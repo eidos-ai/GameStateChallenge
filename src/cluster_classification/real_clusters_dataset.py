@@ -20,7 +20,7 @@ class BBoxClustering:
 class TrackCluster:
     cluster_id: str
     track_ids: List[int]
-    gt_role_id: Optional[int]
+    gt_role_id: Optional[int] = None
 
 @dataclass
 class TrackClustering:
@@ -28,7 +28,7 @@ class TrackClustering:
     video: str
     is_valid: bool
     # Annotations of Tracks for that video
-    gt_tracks: Optional[List[Track]]
+    gt_tracks: Optional[List[Track]] = None
     
 
 class RealClustersDataset(Dataset):

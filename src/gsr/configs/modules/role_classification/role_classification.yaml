@@ -2,4 +2,4 @@ _target_: gsr.modules.role_classification.role_classification.RoleClassification
 batch_size: 16
 cfg:
   device: "cuda"
-  model_path: "${model_dir}/role_classification/GAM-696.pt"
+  model_path: "${model_dir}/role_classification/GAM747.pk"

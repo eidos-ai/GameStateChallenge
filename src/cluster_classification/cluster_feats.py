@@ -3,7 +3,6 @@ from dataclasses import dataclass, astuple, fields
 from collections import defaultdict
 from typing import List
 from cluster_classification_dataset import Track
-from gsr.utils.neptune_logger import NeptuneLogger
 
 @dataclass
 class Feats:
@@ -11,17 +10,17 @@ class Feats:
     y_avg_pos_this_tracks: float | None
     x_avg_pos_rest_tracks: float | None
     y_avg_pos_rest_tracks: float | None
-    len_this_tracks: int
-    len_rest_tracks: int
-    avg_this_tracks_per_frame: float
-    avg_rest_tracks_per_frame: float
+    
+    bbox_per_frame_this_tracks: int
+    bbox_per_frame_rest_tracks: int
+    
     apps_this_tracks_left_half: int
     apps_this_tracks_right_half: int
     apps_rest_tracks_left_half: int
     apps_rest_tracks_right_half: int
 
     def __str__(self):
-        return f'Feats(\n    x_avg_pos_this_tracks={self.x_avg_pos_this_tracks}, \n    y_avg_pos_this_tracks={self.y_avg_pos_this_tracks}, \n    x_avg_pos_rest_tracks={self.x_avg_pos_rest_tracks}, \n    y_avg_pos_rest_tracks={self.y_avg_pos_rest_tracks}, \n    len_this_tracks={self.len_this_tracks}, \n    len_rest_tracks={self.len_rest_tracks}, \n    avg_this_tracks_per_frame={self.avg_this_tracks_per_frame}, \n    avg_rest_tracks_per_frame={self.avg_rest_tracks_per_frame}, \n    apps_this_tracks_left_half={self.apps_this_tracks_left_half}, \n    apps_this_tracks_right_half={self.apps_this_tracks_right_half}, \n    apps_rest_tracks_left_half={self.apps_rest_tracks_left_half}, \n    apps_rest_tracks_right_half={self.apps_rest_tracks_right_half} \n)'
+        return f'Feats(\n    x_avg_pos_this_tracks={self.x_avg_pos_this_tracks}, \n    y_avg_pos_this_tracks={self.y_avg_pos_this_tracks}, \n    x_avg_pos_rest_tracks={self.x_avg_pos_rest_tracks}, \n    y_avg_pos_rest_tracks={self.y_avg_pos_rest_tracks}, \n    bbox_per_frame_this_tracks={self.bbox_per_frame_this_tracks}, \n    bbox_per_frame_rest_tracks={self.bbox_per_frame_rest_tracks}, \n  apps_this_tracks_left_half={self.apps_this_tracks_left_half}, \n    apps_this_tracks_right_half={self.apps_this_tracks_right_half}, \n    apps_rest_tracks_left_half={self.apps_rest_tracks_left_half}, \n    apps_rest_tracks_right_half={self.apps_rest_tracks_right_half} \n)'
     def __repr__(self):
         return self.__str__()
 
@@ -29,9 +28,24 @@ class Feats:
         return np.array(astuple(self))
 
 
+def average_bboxes_per_frame(tracks: List[Track]):
+    frame_counts = defaultdict(int)
+
+    # Count the number of bboxes for each frame across all tracks
+    for track in tracks:
+        for bbox in track.bboxes:
+            frame_counts[bbox.frame] += 1
+
+    # Compute the average number of bboxes per frame
+    total_bboxes = sum(frame_counts.values())
+    num_frames = len(frame_counts)
+    average_bboxes = total_bboxes / num_frames if num_frames > 0 else 0
+
+    return average_bboxes
+
 class ClusterFeats():
-    def __init__(self, neptune_logger: NeptuneLogger=None):
-        self.neptune_logger = neptune_logger
+    def __init__(self):
+        pass
         
     def forward(self, this_tracks: List[Track], rest_tracks: List[Track]) -> Feats:
         x_avg_pos_this_tracks = 0
@@ -97,47 +111,24 @@ class ClusterFeats():
             y_avg_pos_rest_tracks = round(y_avg_pos_rest_tracks/not_none_bboxes_rest_tracks, 2)
         else:
             y_avg_pos_rest_tracks = None
-
-        len_this_tracks = len(this_tracks)
-        len_rest_tracks = len(rest_tracks)
-
-        this_tracks_per_frame = defaultdict(int)
-        for i in range(1,751):
-            this_tracks_per_frame[str(i)] = 0
-        for track in this_tracks:
-            for bbox in track.bboxes:
-                bbox_frame = str(bbox.frame)[-3:]
-                this_tracks_per_frame[bbox_frame] += 1
-        total = sum(list(this_tracks_per_frame.values()))        
-        avg_this_tracks_per_frame = round(total/750, 2)
-
-        rest_tracks_per_frame = defaultdict(int)
-        for i in range(1,751):
-            rest_tracks_per_frame[str(i)] = 0
-        for track in rest_tracks:
-            for bbox in track.bboxes:
-                bbox_frame = str(bbox.frame)[-3:]
-                rest_tracks_per_frame[bbox_frame] += 1
-        total = sum(list(rest_tracks_per_frame.values()))                
-        avg_rest_tracks_per_frame = round(total/750, 2)
+    
+        bbox_per_frame_this_tracks = average_bboxes_per_frame(this_tracks)
+        bbox_per_frame_rest_tracks = average_bboxes_per_frame(rest_tracks)
 
         feats = Feats(
                     x_avg_pos_this_tracks=x_avg_pos_this_tracks,
                     y_avg_pos_this_tracks=y_avg_pos_this_tracks,
                     x_avg_pos_rest_tracks=x_avg_pos_rest_tracks,
                     y_avg_pos_rest_tracks=y_avg_pos_rest_tracks,
-                    len_this_tracks=len_this_tracks,
-                    len_rest_tracks=len_rest_tracks,
-                    avg_this_tracks_per_frame=avg_this_tracks_per_frame,
-                    avg_rest_tracks_per_frame=avg_rest_tracks_per_frame,
+            
+                    bbox_per_frame_this_tracks=bbox_per_frame_this_tracks,
+                    bbox_per_frame_rest_tracks=bbox_per_frame_rest_tracks,
+            
                     apps_this_tracks_left_half=apps_this_tracks_left_half,
                     apps_this_tracks_right_half=apps_this_tracks_right_half,
                     apps_rest_tracks_left_half=apps_rest_tracks_left_half,
                     apps_rest_tracks_right_half=apps_rest_tracks_right_half
-                    )  
-        if self.neptune_logger is not None:
-            chosen_feats = [f.name for f in fields(feats)]
-            self.neptune_logger.log(f"feats", str(chosen_feats))
+                    )
         return feats
 
 

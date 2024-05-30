@@ -4,14 +4,13 @@ import torch
 import logging
 import sys
 import os
-parent_dir = os.path.dirname(os.path.dirname(__file__))
-sys.path.append(parent_dir)
-from models.resnet import ResnetMLP
-from models.resnet import TRANSFORM
 from tracklab.utils.collate import default_collate, Unbatchable
 from tracklab.pipeline.detectionlevel_module import DetectionLevelModule
 
-from gsr.modules.inspector import inn
+from gsr.modules.role_embeddings.models.resnet import ResnetMLP
+from gsr.modules.role_embeddings.models.resnet import TRANSFORM
+
+from gsr.inspector import inn
 from torchvision import transforms
 
 

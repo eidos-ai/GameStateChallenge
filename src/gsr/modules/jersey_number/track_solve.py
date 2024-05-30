@@ -47,8 +47,8 @@ def average_split(arr, num_splits=15):
     return results
     
 class TrackJerseyNumberDetection(VideoLevelModule):
-    input_columns = []
-    output_columns = ["bbox_jersey_number"]
+    input_columns = ["bbox_jersey_number"]
+    output_columns = ["jersey", "jn_tracklet_confidence"]
     collate_fn = default_collate
     
     def __init__(self, cfg, **kwargs):
@@ -56,19 +56,19 @@ class TrackJerseyNumberDetection(VideoLevelModule):
         self.cfg = cfg
         self.num_splits = cfg.num_splits
         self.model = SampleLSTM(1e-4, self.cfg.hidden_size, self.cfg.num_layers)
+        self.model.eval()
         
 #         learning_rate = 1e-4 # Not used really
 #         self.model = ConvNext(self.cfg.model_name, 100, learning_rate)
 #         self.model.load_model(self.cfg.model_path)
 #         self.model.to(self.cfg.device)
-#         self.model.eval()
 #         self.inference_transform = self.model.get_transform(is_training= False)
         
     @torch.no_grad()
     def process(self, detections: pd.DataFrame, metadatas: pd.DataFrame):
         df_sorted = detections.sort_values(by=['track_id', 'image_id'])
         # Group by track_id and aggregate jersey_number_detection into a single array
-        result_df = df_sorted.groupby('track_id')['jersey_number_detection'].agg(lambda x: np.vstack(x))
+        result_df = df_sorted.groupby('track_id')['bbox_jersey_number'].agg(lambda x: np.vstack(x))
     
         # Process the concatenated array in batches of 8 track_ids
         for i in range(0, len(result_df), self.cfg.batch_size):
@@ -93,7 +93,7 @@ class TrackJerseyNumberDetection(VideoLevelModule):
             for idx, track_id in enumerate(batch_track_ids):
                 # Update the DataFrame with the predicted jersey numbers and confidences
                 track_indices = detections[detections['track_id'] == track_id].index
-                detections.loc[track_indices, 'jersey_number_detection'] = pred_jerseys[idx].numpy()
-                detections.loc[track_indices, 'jersey_number_confidence'] = pred_confs[idx].numpy()
+                detections.loc[track_indices, 'jersey'] = pred_jerseys[idx].numpy()
+                detections.loc[track_indices, 'jn_tracklet_confidence'] = pred_confs[idx].numpy()
 
         return detections

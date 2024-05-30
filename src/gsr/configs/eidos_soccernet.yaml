@@ -30,8 +30,12 @@ pipeline:
   - bbox_detector
   - reid
   - track
+  - pitch
+  - calibration
   - jersey_number_bbox
+  - role_embeddings
   - jersey_number_track
+  - role_classification
 
 
 # Experiment name
@@ -64,7 +68,7 @@ print_config: False
 # Dataset
 dataset:
   nvid: 3  # For a quick first inference, only the first video is processed. Use "-1" to process all the videos.
-  eval_set: "valid"  # Tracking is performed on the SoccerNet validation set. Choose from {"train", "valid", "test", "challenge"}.
+  eval_set: "test"  # Tracking is performed on the SoccerNet validation set. Choose from {"train", "valid", "test", "challenge"}.
   dataset_path: ${data_dir}/SoccerNetGS  # The SoccerNet game state dataset is located under the data path (defined above) in the 'SoccerNetGS' folder
   vids_dict: # Use one key per split (valid, test, etc)
     valid: ['SNGS-038', 'SNGS-040', 'SNGS-041']  # Specify explicitly which video to apply tracking on, e.g. ['SNGS-004', 'SNGS-051'] . Ignored when left empty.

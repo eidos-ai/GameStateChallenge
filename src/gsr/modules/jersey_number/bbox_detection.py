@@ -45,5 +45,5 @@ class BBoxJerseyNumberDetection(DetectionLevelModule):
             pred_scores = self.model(img)
             pred_scores_array = pred_scores.cpu().numpy()
         array_list = [np.array(row) for row in pred_scores_array]    
-        detections['jersey_number_detection'] = array_list
+        detections['bbox_jersey_number'] = array_list
         return detections
