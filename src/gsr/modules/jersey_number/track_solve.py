@@ -14,7 +14,16 @@ from gsr.modules.jersey_number.models.samplelstm import SampleLSTM
 
 log = logging.getLogger(__name__)
 
+import torch.nn as nn
+class MaxMeanTrackSolver(nn.Module):
+    def __init__(self):
+        super(MaxMeanTrackSolver, self).__init__()
 
+    def forward(self, track_predictions: np.array):
+        mean = np.mean(track_predictions, axis= 0)
+        max_label = np.argmax(mean)
+        return max_label
+    
 def average_split(arr, num_splits=15):
     arr = torch.from_numpy(arr)
     # Calculate the size of each full split and the number of elements in the last, possibly smaller, split
@@ -67,6 +76,8 @@ class TrackJerseyNumberDetection(VideoLevelModule):
         
     @torch.no_grad()
     def process(self, detections: pd.DataFrame, metadatas: pd.DataFrame):
+        track_solver = MaxMeanTrackSolver()
+
         df_sorted = detections.sort_values(by=['track_id', 'image_id'])
         # Group by track_id and aggregate jersey_number_detection into a single array
         result_df = df_sorted.groupby('track_id')['bbox_jersey_number'].agg(lambda x: np.vstack(x))
@@ -78,24 +89,10 @@ class TrackJerseyNumberDetection(VideoLevelModule):
 
             # Prepare the batch
             for track_id in batch_track_ids:
-                combined_array = result_df[track_id]
-                track_detections = average_split(combined_array, 10)
-                track_detections = track_detections.unsqueeze(dim=0)
-                batch_track_detections.append(track_detections)
-
-            # Concatenate all detections in the batch for model processing
-            batch_track_detections = torch.cat(batch_track_detections, dim=0)
-
-            # Process the batch through the model
-            class_predictions = self.model(batch_track_detections)
-            pred_jerseys, pred_confs = self.model.pred_to_label(class_predictions)
-
-            # Print the results
-            for idx, track_id in enumerate(batch_track_ids):
-                # Update the DataFrame with the predicted jersey numbers and confidences
+                track_detections = result_df[track_id]
+                max_confidence_class= track_solver(track_detections)
                 track_indices = detections[detections['track_id'] == track_id].index
-                detections.loc[track_indices, 'jersey'] = int(pred_jerseys[idx].numpy())
-                detections.loc[track_indices, 'jersey_number'] = int(pred_jerseys[idx].numpy())
-                detections.loc[track_indices, 'jn_tracklet_confidence'] = pred_confs[idx].numpy()
+                detections.loc[track_indices, 'jersey'] = max_confidence_class
+                detections.loc[track_indices, 'jersey_number'] = max_confidence_class
 
         return detections
