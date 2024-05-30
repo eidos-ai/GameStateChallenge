@@ -1,4 +1,4 @@
-_target_: gsr.role_classification.role_classification.RoleClassification
+_target_: gsr.modules.role_classification.role_classification.RoleClassification
 batch_size: 16
 cfg:
   device: "cuda"

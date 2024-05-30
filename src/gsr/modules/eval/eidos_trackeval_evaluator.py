@@ -7,7 +7,8 @@ from typing import Any, Union
 from pathlib import Path
 from tabulate import tabulate  # type: ignore
 from tracklab.core import Evaluator as EvaluatorBase  # type: ignore
-from gsr.utils.neptune_logger import NeptuneLogger
+import sys
+from gsr.modules.utils.neptune_logger import NeptuneLogger
 
 from omegaconf import DictConfig  # type: ignore
 from tracklab.wrappers.datasets.soccernet.soccernet_game_state import SoccerNetGameState  # type: ignore

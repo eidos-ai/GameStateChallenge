@@ -12,10 +12,8 @@ from dataclasses import dataclass
 from tracklab.pipeline.videolevel_module import VideoLevelModule
 from sklearn.cluster import KMeans
 
-parent_dir = os.path.dirname(os.path.dirname(__file__))
-sys.path.append(parent_dir)
-from gsr.inspector import inn
-from gsr.cluster_feats import ClusterFeats, Track, BBox
+from gsr.modules.inspector import inn
+from gsr.modules.cluster_feats import ClusterFeats, Track, BBox
 
 def get_role_and_team(pred_role_id: int):
     if pred_role_id == 0: # player_left

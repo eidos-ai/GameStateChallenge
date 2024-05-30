@@ -1,0 +1,9 @@
+_target_: gsr.modules.jersey_number.track_solve.TrackJerseyNumberDetection
+cfg:
+    batch_size: 16
+    num_splits: 10
+    hidden_size: 128
+    num_layers: 2
+    device: "cuda"
+    model_name: "convnextv2_large.fcmae_ft_in22k_in1k"
+    model_path: "${model_dir}/jersey_number/GAM727-epoch3.pt"

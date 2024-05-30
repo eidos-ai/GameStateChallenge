@@ -1,5 +1,5 @@
 
-_target_: gsr.bbox_detector.fake_yolov8.FakeYOLOv8
+_target_: gsr.modules.bbox_detector.fake_yolov8.FakeYOLOv8
 batch_size: 4
 cfg:
   # models available :

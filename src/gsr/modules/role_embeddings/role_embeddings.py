@@ -10,7 +10,8 @@ from models.resnet import ResnetMLP
 from models.resnet import TRANSFORM
 from tracklab.utils.collate import default_collate, Unbatchable
 from tracklab.pipeline.detectionlevel_module import DetectionLevelModule
-from gsr.inspector import inn
+
+from gsr.modules.inspector import inn
 from torchvision import transforms
 
 

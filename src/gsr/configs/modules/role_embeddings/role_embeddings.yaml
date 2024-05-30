@@ -1,4 +1,4 @@
-_target_: gsr.role_embeddings.role_embeddings.RoleEmbeddings
+_target_: gsr.modules.role_embeddings.role_embeddings.RoleEmbeddings
 batch_size: 16
 cfg:
   device: "cuda"

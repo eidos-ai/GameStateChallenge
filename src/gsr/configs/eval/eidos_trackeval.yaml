@@ -1,4 +1,4 @@
-_target_: gsr.eval.eidos_trackeval_evaluator.TrackEvalEvaluator
+_target_: gsr.modules.eval.eidos_trackeval_evaluator.TrackEvalEvaluator
 
 
 eval_set: ${dataset.eval_set}
