@@ -56,6 +56,7 @@ class TrackJerseyNumberDetection(VideoLevelModule):
         self.cfg = cfg
         self.num_splits = cfg.num_splits
         self.model = SampleLSTM(1e-4, self.cfg.hidden_size, self.cfg.num_layers)
+        self.model.load_model(cfg.model_path)
         self.model.eval()
         
 #         learning_rate = 1e-4 # Not used really
@@ -93,7 +94,8 @@ class TrackJerseyNumberDetection(VideoLevelModule):
             for idx, track_id in enumerate(batch_track_ids):
                 # Update the DataFrame with the predicted jersey numbers and confidences
                 track_indices = detections[detections['track_id'] == track_id].index
-                detections.loc[track_indices, 'jersey'] = pred_jerseys[idx].numpy()
+                detections.loc[track_indices, 'jersey'] = int(pred_jerseys[idx].numpy())
+                detections.loc[track_indices, 'jersey_number'] = int(pred_jerseys[idx].numpy())
                 detections.loc[track_indices, 'jn_tracklet_confidence'] = pred_confs[idx].numpy()
 
         return detections

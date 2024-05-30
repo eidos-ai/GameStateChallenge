@@ -1,6 +1,6 @@
 _target_: gsr.modules.jersey_number.track_solve.TrackJerseyNumberDetection
 cfg:
-    batch_size: 16
+    batch_size: 32
     num_splits: 2
     hidden_size: 256
     num_layers: 2
