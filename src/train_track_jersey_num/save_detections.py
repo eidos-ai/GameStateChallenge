@@ -30,7 +30,7 @@ def evaluate_track_number_recognition(data_path, model_path, out_path):
     Path(out_path).mkdir(exist_ok=True, parents=True)
     
     # Load model
-    model_name = "convnextv2_base.fcmae_ft_in22k_in1k"
+    model_name = "convnextv2_large.fcmae_ft_in22k_in1k"
     model = ConvNext(model_name, 100, None)
     model.load_model(model_path)
     model = model.to(device)

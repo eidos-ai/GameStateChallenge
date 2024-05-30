@@ -78,6 +78,8 @@ class TrackSolverTrainer(pl.LightningModule):
         # Load Model
         if model_arch == "SampleLSTM":
             self.model = SampleLSTM(learning_rate, hidden_size, num_layers)
+        elif model_arch == "CNNFusion":
+            self.model = CNNFusion(learning_rate, 2)
         elif model_arch == "SampleFusion":
             self.model = SampleFusion(
                 learning_rate,
@@ -160,7 +162,7 @@ class TrackSolverTrainer(pl.LightningModule):
         self.log(f'val_loss/{dataset_name}', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, add_dataloader_idx = False)
         
         pred_labels = self.model.pred_to_label(pred_y_batch)
-        
+        print(pred_labels)
         accuracy = torch.sum(pred_labels == gt_batch) / float(gt_batch.size(0))
         self.log(f'val_accuracy/{dataset_name}', accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True, add_dataloader_idx = False)
         
@@ -226,7 +228,7 @@ if __name__ == "__main__":
     parser.add_argument('-ep', '--epochs', type=int, default=2000, required=False, help='Number of epochs for training')
     parser.add_argument('-tb', '--batch_size', type=int, default=32, required=False, help='Batch size')
     
-    parser.add_argument('-m', '--model', type=str, default='SampleLSTM', choices=['SampleLSTM', 'SampleFusion'], required=False, help='Model Architecture name')
+    parser.add_argument('-m', '--model', type=str, default='SampleLSTM', choices=['SampleLSTM', 'SampleFusion', 'CNNFusion'], required=False, help='Model Architecture name')
     parser.add_argument('-s', '--samples', type=int, default=15, required=False, help='How many samples of the track')
     parser.add_argument('-hi', '--hidden', type=int, default=128, required=False, help='Hidden size')
     parser.add_argument('-l', '--num_layers', type=int, default=2, required=False, help='Num Layers')

@@ -25,13 +25,13 @@ class CNNFusion(pl.LightningModule):
         # elementwise sum Conv3 1+Conv3 2
         self.conv4 = nn.Conv1d(70, 70, 2, stride=1, padding=1, bias=True) # input size (102, 70)
         self.max_pool = nn.MaxPool1d(2, stride=2) # size (102, 50)
-        self.fc1 = nn.Linear(70*50, 256)
+        self.fc1 = nn.Linear(7000, 256)
         self.fc2 = nn.Linear(256, 256)
         self.fc3 = nn.Linear(256, 101)
         
     def forward(self, x):
-        # logging.info(f"Model Input x {x.shape}")
-        # print(f"input size : {x.size()}")
+        logging.info(f"Model Input x {x.shape}")
+        print(f"input size : {x.size()}")
         # x size (1, 101)
         conv1_out = self.conv1(x) # size (20,101)
         # print(f"conv1_out size : {conv1_out.size()}")

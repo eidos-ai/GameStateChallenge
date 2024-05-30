@@ -128,7 +128,7 @@ class TrackDetectionsDataset(Dataset):
         if self.transform:
             track_predictions, jersey_number = self.transform((track_predictions, jersey_number))
 
-        # track_predictions = scipy.special.softmax(track_predictions,axis=0)
+        track_predictions = scipy.special.softmax(track_predictions,axis=0)
         
         # Returning mean
         # track_average_scores = np.mean(track_predictions, axis= 0)
