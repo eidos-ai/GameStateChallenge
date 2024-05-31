@@ -68,16 +68,37 @@ class TrackJerseyNumberDetection(VideoLevelModule):
         self.model.load_model(cfg.model_path)
         self.model.eval()
         
-#         learning_rate = 1e-4 # Not used really
-#         self.model = ConvNext(self.cfg.model_name, 100, learning_rate)
-#         self.model.load_model(self.cfg.model_path)
-#         self.model.to(self.cfg.device)
-#         self.inference_transform = self.model.get_transform(is_training= False)
+        # learning_rate = 1e-4 # Not used really
+        # self.model = ConvNext(self.cfg.model_name, 100, learning_rate)
+        # self.model.load_model(self.cfg.model_path)
+        # self.model.to(self.cfg.device)
+        # self.inference_transform = self.model.get_transform(is_training= False)
         
+    # @torch.no_grad()
+    # def process(self, detections: pd.DataFrame, metadatas: pd.DataFrame):
+#         track_solver = MaxMeanTrackSolver()
+
+#         df_sorted = detections.sort_values(by=['track_id', 'image_id'])
+#         # Group by track_id and aggregate jersey_number_detection into a single array
+#         result_df = df_sorted.groupby('track_id')['bbox_jersey_number'].agg(lambda x: np.vstack(x))
+    
+#         # Process the concatenated array in batches of 8 track_ids
+#         for i in range(0, len(result_df), self.cfg.batch_size):
+#             batch_track_ids = list(result_df.keys())[i:i + self.cfg.batch_size]
+#             batch_track_detections = []
+
+#             # Prepare the batch
+#             for track_id in batch_track_ids:
+#                 track_detections = result_df[track_id]
+#                 max_confidence_class= int(track_solver(track_detections))
+#                 track_indices = detections[detections['track_id'] == track_id].index
+#                 detections.loc[track_indices, 'jersey_number'] = max_confidence_class
+#         return detections
+
     @torch.no_grad()
     def process(self, detections: pd.DataFrame, metadatas: pd.DataFrame):
         track_solver = MaxMeanTrackSolver()
-
+        print(f"========")
         df_sorted = detections.sort_values(by=['track_id', 'image_id'])
         # Group by track_id and aggregate jersey_number_detection into a single array
         result_df = df_sorted.groupby('track_id')['bbox_jersey_number'].agg(lambda x: np.vstack(x))
@@ -90,9 +111,21 @@ class TrackJerseyNumberDetection(VideoLevelModule):
             # Prepare the batch
             for track_id in batch_track_ids:
                 track_detections = result_df[track_id]
-                max_confidence_class= track_solver(track_detections)
+                track_detections = average_split(track_detections, 10)
+                track_detections = track_detections.unsqueeze(dim=0)
+                batch_track_detections.append(track_detections)
+            
+            #Concatenate all detections in the batch for model processing
+            batch_track_detections = torch.cat(batch_track_detections, dim=0)
+            # Process the batch through the model
+            class_predictions = self.model(batch_track_detections)
+            # print(class_predictions.shape)
+            pred_jerseys, pred_confs = self.model.pred_to_label(class_predictions)
+            # Print the results
+            for idx, track_id in enumerate(batch_track_ids):
                 track_indices = detections[detections['track_id'] == track_id].index
-                detections.loc[track_indices, 'jersey'] = max_confidence_class
-                detections.loc[track_indices, 'jersey_number'] = max_confidence_class
-
+                jersey_number =  int(pred_jerseys[idx].numpy())
+                detections.loc[track_indices, 'jersey_number'] = jersey_number
+                print(f"Track {track_id} Jersey {jersey_number}")
+        
         return detections

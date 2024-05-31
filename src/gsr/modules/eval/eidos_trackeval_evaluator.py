@@ -80,7 +80,7 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
         )
 
         if tracker_state.detections_gt is None or len(tracker_state.detections_gt) == 0:
-            self.log.warning(
+            log.warning(
                 f"Stopping evaluation because the current split ({self.eval_set}) has no ground truth detections."
             )
             return
@@ -132,7 +132,7 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
                 metric = getattr(trackeval.metrics, metric_name)
                 metrics_list.append(metric(metrics_config))
             except AttributeError:
-                self.log.warning(
+                log.warning(
                     f"Skipping evaluation for unknown metric: {metric_name}"
                 )
 

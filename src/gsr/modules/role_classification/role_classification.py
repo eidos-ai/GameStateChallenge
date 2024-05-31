@@ -159,8 +159,14 @@ def get_video_tracks(detections: pd.DataFrame) -> List[Track]:
         bbox_y_image = detections["bbox_ltwh"].iloc[i][1]
         bbox_w_image = detections["bbox_ltwh"].iloc[i][2]
         bbox_h_image = detections["bbox_ltwh"].iloc[i][3]
-        bbox_x_pitch = detections["bbox_pitch"].iloc[i]["x_bottom_middle"]
-        bbox_y_pitch = detections["bbox_pitch"].iloc[i]["y_bottom_middle"]
+        bbox_x_pitch = None
+        bbox_y_pitch = None
+        try:
+            bbox_x_pitch = detections["bbox_pitch"].iloc[i]["x_bottom_middle"]
+            bbox_y_pitch = detections["bbox_pitch"].iloc[i]["y_bottom_middle"]
+        except TypeError:
+            bbox_x_pitch = detections["bbox_pitch"].iloc[i]
+            bbox_y_pitch = detections["bbox_pitch"].iloc[i]
         bbox = BBox(frame=bbox_frame ,x_image=bbox_x_image, y_image=bbox_y_image, w_image=bbox_w_image, h_image=bbox_h_image, x_pitch=bbox_x_pitch, y_pitch=bbox_y_pitch)
         bboxes_per_track_id[detections["track_id"].iloc[i]].append(bbox)
     for track_id, track_bboxes in bboxes_per_track_id.items():
