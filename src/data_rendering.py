@@ -235,15 +235,15 @@ class SoccerNetGS:
         return frame
 
     def show_image(
-    self,
-    frame_path: str,
-    object_annotations: list[Any],
-    pitch_annotation: dict[str, Any],
-    objects_render: bool = True,
-    minimap_render: bool = True,
-    pitch_lines_render: bool = True,
-    save_path: str = None,  # Add this parameter
-) -> None:
+        self,
+        frame_path: str,
+        object_annotations: list[Any],
+        pitch_annotation: dict[str, Any],
+        objects_render: bool = True,
+        minimap_render: bool = True,
+        pitch_lines_render: bool = True,
+        save_path: str = None,  # Add this parameter
+    ) -> None:
         """Show the image."""
         frame = cv.imread(frame_path)
         if pitch_lines_render:
@@ -261,7 +261,7 @@ class SoccerNetGS:
         else:
             plt.show()  # Display the frame
         plt.close()  # Close the plot to free memory
-    
+
 
 if __name__ == "__main__":
     sn = SoccerNetGS()
@@ -270,7 +270,11 @@ if __name__ == "__main__":
         "-v", "--video_number", type=int, required=True, help="Choose video number."
     )
     parser.add_argument(
-        "-s", "--save_path", type=str, default=None, help="Path to save the output image."
+        "-s",
+        "--save_path",
+        type=str,
+        default=None,
+        help="Path to save the output image.",
     )
     args = parser.parse_args()
     path_video, frame_random, path_frame = sn.find_video_path(args.video_number)
