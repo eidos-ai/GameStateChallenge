@@ -16,7 +16,7 @@ class SoccerNetGS:
     """Class to render a random frame from a SoccerNetGS
     video with object annotations and pitch lines."""
 
-    DATA_DIRECTORY = "../data/SoccerNetGS/gamestate-2024/"
+    DATA_DIRECTORY = "../data/SoccerNetGS/"
     RADAR_PATH = "./sn-gamestate/sn_gamestate/visualization/Radar.png"
 
     def __init__(self) -> None:
@@ -242,6 +242,7 @@ class SoccerNetGS:
         objects_render: bool = True,
         minimap_render: bool = True,
         pitch_lines_render: bool = True,
+        save_path: str = None,  # Add this parameter
     ) -> None:
         """Show the image."""
         frame = cv.imread(frame_path)
@@ -254,7 +255,12 @@ class SoccerNetGS:
         frame_rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
         plt.figure(dpi=300)  # Increase DPI for better quality
         plt.imshow(frame_rgb)
-        plt.show()
+        plt.axis("off")  # Hide axes
+        if save_path:
+            plt.savefig(save_path, bbox_inches="tight", pad_inches=0)  # Save the frame
+        else:
+            plt.show()  # Display the frame
+        plt.close()  # Close the plot to free memory
 
 
 if __name__ == "__main__":
@@ -263,8 +269,20 @@ if __name__ == "__main__":
     parser.add_argument(
         "-v", "--video_number", type=int, required=True, help="Choose video number."
     )
+    parser.add_argument(
+        "-s",
+        "--save_path",
+        type=str,
+        default=None,
+        help="Path to save the output image.",
+    )
     args = parser.parse_args()
     path_video, frame_random, path_frame = sn.find_video_path(args.video_number)
     annotations_objects = sn.get_object_annotations(path_video, frame_random)
     annotation_pitch = sn.get_pitch_annotation(path_video, frame_random)
-    sn.show_image(path_frame, annotations_objects, annotation_pitch)
+    sn.show_image(
+        path_frame,
+        annotations_objects,
+        annotation_pitch,
+        save_path=args.save_path,
+    )
