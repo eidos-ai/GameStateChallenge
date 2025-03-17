@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 from ultralytics import YOLO  # type: ignore
-from gsr.utils.neptune_logger import NeptuneLogger
+from mlflow.utils.mlflow_logger import MLflowLogger  # Import Eidos MLflow wrapper
 from validate_yolov8 import ValidateYOLO  # type: ignore
 
 
@@ -14,7 +14,7 @@ class TrainYOLO:
         eval_conf_th: float,
         yaml: str,
         project: str,
-        neptune: bool,
+        mlflow_tracking: bool,
         batch_size: int,
         epochs: int,
         initial_learning_rate: float,
@@ -26,7 +26,7 @@ class TrainYOLO:
         self.eval_conf_th = eval_conf_th
         self.yaml = yaml
         self.project = project
-        self.neptune = neptune
+        self.mlflow_tracking = mlflow_tracking
         self.batch_size = batch_size
         self.epochs = epochs
         self.initial_learning_rate = initial_learning_rate
@@ -34,62 +34,65 @@ class TrainYOLO:
 
     def train(self) -> None:
         experiments_dir = Path(self.experiments)
-
+    
         # Load base model
-        model = YOLO(
-            self.base_model
-        )  # load a pretrained model (recommended for training)
+        model = YOLO(self.base_model)  # load a pretrained model (recommended for training)
 
-        name = (
-            self.name
-            if self.name
-            else f"{self.base_model}_{self.epochs}_{self.eval_conf_th}"
-        )
-
+        name = self.name if self.name else f"{self.base_model}_{self.epochs}_{self.eval_conf_th}"
+    
         # dataset path
-        dataset_path = "/".join(self.yaml.split("/")[:-1])
-
-        # Add training parameters to neptune
-        neptune_logger = NeptuneLogger(
-            enable_run=self.neptune, project=self.project, run_name_or_id=name
-        )
-        neptune_logger.param("dataset path", dataset_path)
-        neptune_logger.param("epochs", self.epochs)
-        neptune_logger.param("Eval conf th", self.eval_conf_th)
-        neptune_logger.param("batch size", self.batch_size)
-        neptune_logger.param("Yolo model", self.base_model)
-        neptune_logger.param("lr0", self.initial_learning_rate)
-        neptune_logger.param("lrf", self.final_learning_rate)
-        experiment_id = neptune_logger.get_id()
-        neptune_logger.tags("TrainYOLO")
+        dataset_path = "../../data/YoloDataset"  # "/".join(self.yaml.split("/")[:-1])
+    
+        # Initialize MLflowLogger (Eidos wrapper)
+        if self.mlflow_tracking:
+            mlflow_logger = MLflowLogger(
+                enable_run=True,  # Enable MLflow tracking
+                exp_name=self.project,  # Experiment name
+                run_name=name,  # Run name
+                run_description="Training YOLOv8 model",  # Run description
+                log_system_metrics=True  # Log system metrics
+            )
+            mlflow_logger.log_param("dataset_path", dataset_path)
+            mlflow_logger.log_param("epochs", self.epochs)
+            mlflow_logger.log_param("eval_conf_th", self.eval_conf_th)
+            mlflow_logger.log_param("batch_size", self.batch_size)
+            mlflow_logger.log_param("yolo_model", self.base_model)
+            mlflow_logger.log_param("initial_learning_rate", self.initial_learning_rate)
+            mlflow_logger.log_param("final_learning_rate", self.final_learning_rate)
+            mlflow_logger.set_run_tag("task", "TrainYOLO")
+        
+        print(f"MLflow Run ID: {mlflow_logger.get_run_id()}")
 
         # Start training
         model.train(
             data=self.yaml,
             epochs=self.epochs,
             batch=self.batch_size,
-            name=experiment_id,
+            name=name,
             project=str(experiments_dir),
             lr0=self.initial_learning_rate,
             lrf=self.final_learning_rate,
+            
         )  # train the model
-        results_path = Path(experiments_dir, experiment_id)
-
+        results_path = Path(experiments_dir, name)
+    
         # Upload confusion matrix and other files
-        images_names = [
-            "confusion_matrix.png",
-            "F1_curve.png",
-            "labels.jpg",
-            "P_curve.png",
-            "PR_curve.png",
-            "R_curve.png",
-            "results.png",
-        ]
-        for im_name in images_names:
-            im_path = results_path.joinpath(im_name)
-            neptune_logger.upload_file(im_name, im_path)
-
-        # Perfom evaluation on validation dataset
+        if self.mlflow_tracking:
+            images_names = [
+                "confusion_matrix.png",
+                "F1_curve.png",
+                "labels.jpg",
+                "P_curve.png",
+                "PR_curve.png",
+                "R_curve.png",
+                "results.png",
+            ]
+            for im_name in images_names:
+                im_path = results_path.joinpath(im_name)
+                if im_path.exists():
+                    mlflow_logger.log_artifact(str(im_path), im_name)
+    
+        # Perform evaluation on validation dataset
         validate_yolo = ValidateYOLO(
             self.base_model,
             self.experiments,
@@ -97,14 +100,15 @@ class TrainYOLO:
             self.eval_conf_th,
             self.yaml,
             self.project,
-            self.neptune,
+            self.mlflow_tracking,
             self.batch_size,
-            neptune_logger,
+            mlflow_logger
         )
         validate_yolo.validate()
-
-        # Stop NeptuneLogger instance
-        neptune_logger.stop()
+    
+        # Stop MLflowLogger instance
+        if self.mlflow_tracking:
+            mlflow_logger.stop_run()
 
 
 if __name__ == "__main__":
@@ -149,11 +153,11 @@ if __name__ == "__main__":
         help="Confidence score used for evaluation of model",
     )
     parser.add_argument(
-        "--neptune",
+        "--mlflow",
         required=False,
         action="store_true",
         default=False,
-        help="Log experiment results to neptune",
+        help="Log experiment results to MLflow",
     )
     parser.add_argument(
         "--experiments",
@@ -193,7 +197,7 @@ if __name__ == "__main__":
         args.eval_conf_th,
         args.yaml,
         args.project,
-        args.neptune,
+        args.mlflow,
         args.batch_size,
         args.epochs,
         args.initial_learning_rate,
