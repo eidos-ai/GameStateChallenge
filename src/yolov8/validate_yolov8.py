@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 from ultralytics import YOLO  # type: ignore
-from gsr.utils.neptune_logger import NeptuneLogger
+from mlflow.utils.mlflow_logger import MLflowLogger
 
 
 class ValidateYOLO:
@@ -13,9 +13,9 @@ class ValidateYOLO:
         eval_conf_th: float,
         yaml: str,
         project: str,
-        neptune: bool,
+        mlflow_tracking: bool,
         batch_size: int,
-        neptune_logger: NeptuneLogger = None,  # type: ignore
+        mlflow_logger: MLflowLogger = None,  # type: ignore
     ) -> None:
         self.experiments = experiments
         self.base_model = base_model
@@ -23,9 +23,9 @@ class ValidateYOLO:
         self.eval_conf_th = eval_conf_th
         self.yaml = yaml
         self.project = project
-        self.neptune = neptune
+        self.mlflow_tracking = mlflow_tracking
         self.batch_size = batch_size
-        self.neptune_logger = neptune_logger
+        self.mlflow_logger = mlflow_logger
 
     def validate(self) -> None:
         experiments_dir = Path(self.experiments)
@@ -40,29 +40,34 @@ class ValidateYOLO:
         # Set dataset path
         dataset_path = "/".join(self.yaml.split("/")[:-1])
 
-        if self.neptune_logger is None:
-            self.neptune_logger = NeptuneLogger(
-                enable_run=self.neptune, project=self.project, run_name_or_id=name
+        # Initialize MLflowLogger if not provided
+        if self.mlflow_logger is None:
+            self.mlflow_logger = MLflowLogger(
+                enable_run=self.mlflow_tracking,
+                exp_name=self.project,
+                run_name=name,
+                run_description="Validation of YOLOv8 model",
+                log_system_metrics=True,
             )
-        self.neptune_logger.param("dataset path", dataset_path)
-        self.neptune_logger.param("conf", self.eval_conf_th)
-        self.neptune_logger.param("batch size", self.batch_size)
-        self.neptune_logger.param("Yolo model", self.base_model)
-        self.experiment_id = self.neptune_logger.get_id()
-        self.neptune_logger.tags("ValYOLO")
 
-        results_path = Path(experiments_dir, self.experiment_id)
+        # Log parameters
+        self.mlflow_logger.log_param("dataset_path", dataset_path)
+        self.mlflow_logger.log_param("conf", self.eval_conf_th)
+        self.mlflow_logger.log_param("batch_size", self.batch_size)
+        self.mlflow_logger.log_param("Yolo model", self.base_model)
+        self.mlflow_logger.set_run_tag("task", "ValYOLO")
 
         # Validate the model
         val_metrics = model.val(
             data=self.yaml,
             batch=self.batch_size,
             conf=self.eval_conf_th,
-            project=str(results_path),
+            project=str(experiments_dir),
         )
 
-        results_path = results_path.joinpath("val")
+        results_path = Path(experiments_dir, self.mlflow_logger.get_run_id(), "val")
 
+        # Log validation artifacts
         images_names = [
             "P_curve.png",
             "PR_curve.png",
@@ -71,9 +76,10 @@ class ValidateYOLO:
 
         for im_name in images_names:
             im_path = results_path.joinpath(im_name)
-            self.neptune_logger.upload_file(im_name, im_path)
+            if im_path.exists():
+                self.mlflow_logger.log_artifact(str(im_path), im_name)
 
-        # Precision and Recall
+        # Log precision and recall for the "person" class
         conf_matrix = val_metrics.confusion_matrix.matrix
         for class_idx, class_name in val_metrics.names.items():
             if class_name == "person":
@@ -83,14 +89,17 @@ class ValidateYOLO:
                 class_R = (
                     conf_matrix[class_idx, class_idx] / conf_matrix[:, class_idx].sum()
                 )
-                self.neptune_logger.log(f"{class_name} Precision", round(class_P, 2))
-                self.neptune_logger.log(f"{class_name} Recall", round(class_R, 2))
+                self.mlflow_logger.log_metric(f"{class_name}_precision", round(class_P, 2))
+                self.mlflow_logger.log_metric(f"{class_name}_recall", round(class_R, 2))
 
-        # Other metrics
+        # Log other metrics (sanitize metric names)
         for metric_name, metric_value in val_metrics.results_dict.items():
-            self.neptune_logger.log(metric_name, metric_value)
+            # Sanitize metric name by replacing invalid characters
+            sanitized_metric_name = metric_name.replace("(", "").replace(")", "")
+            self.mlflow_logger.log_metric(sanitized_metric_name, metric_value)
 
-        self.neptune_logger.stop()
+        # Stop the MLflow run
+        self.mlflow_logger.stop_run()
 
 
 if __name__ == "__main__":
@@ -127,11 +136,11 @@ if __name__ == "__main__":
         help="Confidence score used for evaluation of model",
     )
     parser.add_argument(
-        "--neptune",
+        "--mlflow",
         required=False,
         action="store_true",
         default=False,
-        help="Log experiment results to neptune",
+        help="Log experiment results to MLflow",
     )
     parser.add_argument(
         "--experiments",
@@ -156,7 +165,7 @@ if __name__ == "__main__":
         args.eval_conf_th,
         args.yaml,
         args.project,
-        args.neptune,
+        args.mlflow,
         args.batch_size,
     )
     validate_yolo.validate()

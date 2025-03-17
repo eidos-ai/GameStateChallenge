@@ -39,6 +39,10 @@ The dataset is provided in a format that is not compatible with the YOLOv8 model
 
 **Note:** replace `YOLO_FILE_NAME` with the name of the YOLO file you want to use (e.g. yolo_config).
 
+### MLFlow
+
+In order to run MLFlow we need to provide the tracking URI as a system variable:
+export MLFLOW_TRACKING_URI=http://trackme.eidos.ai/
 
 At this point:
 - the repository and its submodules were cloned,
