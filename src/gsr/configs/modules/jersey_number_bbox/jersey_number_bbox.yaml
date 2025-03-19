@@ -1,0 +1,7 @@
+_target_: gsr.modules.jersey_number.bbox_detection.BBoxJerseyNumberDetection
+batch_size: 16
+cfg:
+  device: "cuda"
+  model_name: "convnextv2_large.fcmae_ft_in22k_in1k"
+  model_path: "${model_dir}/jersey_number/GAM727-epoch3.pt"
+    

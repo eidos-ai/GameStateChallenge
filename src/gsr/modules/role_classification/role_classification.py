@@ -12,26 +12,24 @@ from dataclasses import dataclass
 from tracklab.pipeline.videolevel_module import VideoLevelModule
 from sklearn.cluster import KMeans
 
-parent_dir = os.path.dirname(os.path.dirname(__file__))
-sys.path.append(parent_dir)
 from gsr.inspector import inn
-from gsr.cluster_feats import ClusterFeats, Track, BBox
+from gsr.modules.role_classification.cluster_feats import ClusterFeats, Track, BBox
 
 def get_role_and_team(pred_role_id: int):
     if pred_role_id == 0: # player_left
-        return "player", 0, "left"
+        return "player", "left"
     elif pred_role_id == 1: # player_right
-        return "player", 1, "right"
+        return "player", "right"
     elif pred_role_id == 2: # goalkeeper_left
-        return "goalkeeper", None, "left"
+        return "goalkeeper", "left"
     elif pred_role_id == 3: # goalkeeper_right
-        return "goalkeeper", None, "right"
+        return "goalkeeper", "right"
     elif pred_role_id == 4: # referee
-        return "referee", None, None
+        return "referee", None
     elif pred_role_id == 5: # other
-        return "other", None, None
+        return "other", None
     else:
-        return "player", 1, "right"
+        return "player", "right"
 
 @dataclass
 class ClassifiedTrack:
@@ -44,7 +42,7 @@ class TrackCluster:
     track_ids: List[int]
 
 @dataclass
-class TrackClustering:
+class VideoTrackClustering:
     clusters: List[TrackCluster]
     video_tracks: List[Track] # 
 
@@ -69,8 +67,34 @@ class ClusterPredictionModel():
         feats = self.cluster_feats.forward(cluster_tracks, rest_tracks)
         feats_vector = np.array([feats.to_vector()])
         pred_proba = self.prediction_model.predict_proba(feats_vector)
+        
+        # node_indicator = self.prediction_model.decision_path(feats_vector)
+        # self.print_path(node_indicator)
         # The probability of being valid is 1 - prob being invalid
         return 1 - pred_proba[0][6]
+
+    def print_path(self, node_indicator):
+        print("node_indicator", node_indicator)
+        model = self.prediction_model
+        # Extract the decision path
+        node_index = node_indicator.indices[node_indicator.indptr[0]:
+                                            node_indicator.indptr[1]]
+
+        print("Decision path for sample {}:".format(sample_id))
+        for node_id in node_index:
+            # Check if we're at a leaf
+            if model.tree_.children_left[node_id] == model.tree_.children_right[node_id]:
+                print("Leaf node reached, predicted class:", model.tree_.value[node_id])
+            else:
+                # Decision node
+                if sample[0, model.tree_.feature[node_id]] <= model.tree_.threshold[node_id]:
+                    threshold_sign = "<="
+                else:
+                    threshold_sign = ">"
+                print("Decision node {}: {} {} {:.2f}".format(node_id,
+                                                              feature_names[model.tree_.feature[node_id]],
+                                                              threshold_sign,
+                                                              model.tree_.threshold[node_id]))
 
 def predict_cluster_valid_score(cluster: TrackCluster, model, video_tracks: List[Track]):
     cluster_tracks = [t for t in video_tracks if t.track_id in cluster.track_ids]
@@ -89,7 +113,7 @@ def predict_cluster_class(cluster: TrackCluster, model, video_tracks: List[Track
     return pred_cluster_class
 
 
-def eval_clustering_confidence(clustering: TrackClustering, model) -> float:
+def eval_clustering_confidence(clustering: VideoTrackClustering, model) -> float:
     video_tracks: List[Track] = clustering.video_tracks
     clustering_valid_scores = [predict_cluster_valid_score(cluster, model, video_tracks) for cluster in clustering.clusters]
 
@@ -106,7 +130,7 @@ def eval_clustering_confidence(clustering: TrackClustering, model) -> float:
 
     return clustering_score
 
-def cluster_to_tracks(clustering: TrackClustering, model) -> List[ClassifiedTrack]:
+def cluster_to_tracks(clustering: VideoTrackClustering, model) -> List[ClassifiedTrack]:
     video_tracks: List[Track] = clustering.video_tracks
     classified_tracks: List[ClassifiedTrack] = []
     for cluster in clustering.clusters:
@@ -135,8 +159,14 @@ def get_video_tracks(detections: pd.DataFrame) -> List[Track]:
         bbox_y_image = detections["bbox_ltwh"].iloc[i][1]
         bbox_w_image = detections["bbox_ltwh"].iloc[i][2]
         bbox_h_image = detections["bbox_ltwh"].iloc[i][3]
-        bbox_x_pitch = detections["bbox_pitch"].iloc[i]["x_bottom_middle"]
-        bbox_y_pitch = detections["bbox_pitch"].iloc[i]["y_bottom_middle"]
+        bbox_x_pitch = None
+        bbox_y_pitch = None
+        try:
+            bbox_x_pitch = detections["bbox_pitch"].iloc[i]["x_bottom_middle"]
+            bbox_y_pitch = detections["bbox_pitch"].iloc[i]["y_bottom_middle"]
+        except TypeError:
+            bbox_x_pitch = detections["bbox_pitch"].iloc[i]
+            bbox_y_pitch = detections["bbox_pitch"].iloc[i]
         bbox = BBox(frame=bbox_frame ,x_image=bbox_x_image, y_image=bbox_y_image, w_image=bbox_w_image, h_image=bbox_h_image, x_pitch=bbox_x_pitch, y_pitch=bbox_y_pitch)
         bboxes_per_track_id[detections["track_id"].iloc[i]].append(bbox)
     for track_id, track_bboxes in bboxes_per_track_id.items():
@@ -164,7 +194,7 @@ class RoleClassification(VideoLevelModule):
             kmeans = KMeans(n_clusters=n, random_state=0).fit(embeddings_2d)
             kmeans_clusterings[n] = kmeans.labels_
 
-        track_clusterings: List[TrackClustering] = []
+        track_clusterings: List[VideoTrackClustering] = []
 
         # get all Track instances of the video and save them in video_tracks: List[Track]
         video_tracks = get_video_tracks(detections)
@@ -172,18 +202,10 @@ class RoleClassification(VideoLevelModule):
         # use kmeans for n_clusters = [3, 4, 5, 6]
         for kmeans in kmeans_clusterings.keys():
             predicted_clusters = kmeans_clusterings[kmeans]
-            track_ids = detections["track_id"].tolist()
-            assert len(track_ids) == len(predicted_clusters) # chequeo que haya tantos track_ids como predicciones
-
-            tracks_predictions = defaultdict(list) # creo un dict {track_id: most_predicted_cluster_id}
-            for track_idx, track_id in enumerate(track_ids):
-                if np.isnan(track_id):
-                    continue
-                temp_track_predictions: List[int] = []
-                for pred_idx, prediction in enumerate(predicted_clusters):
-                    if track_ids[pred_idx] == track_id:
-                        temp_track_predictions.append(prediction)
-                tracks_predictions[track_id] = Counter(temp_track_predictions).most_common(1)[0][0]
+            detections['predicted_cluster'] = kmeans_clusterings[kmeans]
+            
+            majority_cluster = detections.groupby('track_id')['predicted_cluster'].agg(lambda x: x.mode()[0])
+            tracks_predictions = majority_cluster.to_dict()
 
             # generate a list of TrackCluster objects
             clusters = defaultdict(list)
@@ -194,34 +216,43 @@ class RoleClassification(VideoLevelModule):
             for idx, track_ids in enumerate(clusters.values()):
                 track_clusters.append(TrackCluster(cluster_id=alpha_cluster_id[idx], track_ids=track_ids))
 
-            # create a TrackClustering object
-            track_clustering = TrackClustering(clusters=track_clusters, video_tracks=video_tracks)
+            # create a VideoTrackClustering object
+            track_clustering = VideoTrackClustering(clusters=track_clusters, video_tracks=video_tracks)
             track_clusterings.append(track_clustering)
 
         clustering_confidences = [eval_clustering_confidence(c, self.model) for c in track_clusterings]
-        best_clustering: TrackClustering = track_clusterings[clustering_confidences.index(max(clustering_confidences))]
+        best_clustering: VideoTrackClustering = track_clusterings[clustering_confidences.index(max(clustering_confidences))]
         track_predictions = cluster_to_tracks(best_clustering, self.model) # List[ClassifiedTrack(track_id, pred_role_id]
 
-        print("///////")
-        print(best_clustering)
-        print("///////")
-        print([classified_track.pred_role_id for classified_track in track_predictions])
-        print("///////")
-
-        detections['team_cluster'] = None
-        detections['team'] = None
-        detections['role'] = None
+        # Create a DataFrame column from 'track_id' using map to look up 'pred_role_id' and apply the role function
         track_id_to_pred_role_id = {ct.track_id: ct.pred_role_id for ct in track_predictions}
-        for idx, row in detections.iterrows():
-            if row['track_id'] in track_id_to_pred_role_id:
-                role, team_cluster, side = get_role_and_team(track_id_to_pred_role_id[row['track_id']])
-                detections.at[idx, 'role'] = role
-                detections.at[idx, 'team_cluster'] = team_cluster
-                detections.at[idx, 'team'] = side
-
-        print("///////")
-        print(detections.info())
-        print("///////")
-        print(detections.head(150))
-        print("///////")
+        role_data = detections['track_id'].map(track_id_to_pred_role_id).map(get_role_and_team).apply(pd.Series)
+        role_data.columns = ['role', 'team']
+        
+        # Assign the new columns to the original DataFrame
+        detections = detections.assign(**role_data)
         return detections
+
+#         print("///////")
+#         print(best_clustering)
+#         print("///////")
+#         print([classified_track.pred_role_id for classified_track in track_predictions])
+#         print("///////")
+
+#         detections['team_cluster'] = None
+#         detections['team'] = None
+#         detections['role'] = None
+#         track_id_to_pred_role_id = {ct.track_id: ct.pred_role_id for ct in track_predictions}
+#         for idx, row in detections.iterrows():
+#             if row['track_id'] in track_id_to_pred_role_id:
+#                 role, team_cluster, side = get_role_and_team(track_id_to_pred_role_id[row['track_id']])
+#                 detections.at[idx, 'role'] = role
+#                 detections.at[idx, 'team_cluster'] = team_cluster
+#                 detections.at[idx, 'team'] = side
+
+#         print("///////")
+#         print(detections.info())
+#         print("///////")
+#         print(detections.head(150))
+#         print("///////")
+#         return detections

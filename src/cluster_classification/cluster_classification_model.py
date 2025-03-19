@@ -16,7 +16,7 @@ from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, accuracy_score, precision_score, recall_score
 
-from gsr.utils.neptune_logger import NeptuneLogger
+from utils.neptune_logger import NeptuneLogger
 
 @dataclass
 class DatasetConfiguration:
@@ -81,7 +81,7 @@ class DatasetRegistry:
         valid_datasets = [(dataset, self.registry[dataset]) for dataset in self.conf.valid_datasets]
         return valid_datasets        
       
-def evaluate_model(model_instance, dataset_name: str, dataset: Dataset, neptune_logger: NeptuneLogger):
+def evaluate_model(model_instance, dataset_name: str, dataset: Dataset, cluster_feats, neptune_logger: NeptuneLogger):
     X = []
     y = []
     for data in tqdm(dataset, total=len(dataset), desc=f'Iterating over {dataset_name} dataset'):
@@ -159,9 +159,9 @@ def run_model(model: str, neptune_logger: NeptuneLogger, store_model: str, train
     
     # Evaluate
     for dataset_name, dataset in valid_dataset:
-        evaluate_model(model_instance, dataset_name, dataset, neptune_logger)
+        evaluate_model(model_instance, dataset_name, dataset,  cluster_feats, neptune_logger)
         if isinstance(dataset, RealClustersDataset):
-            track_metrics = evaluate_clustering(dataset, model_instance, neptune_logger)
+            track_metrics = evaluate_clustering(dataset, model_instance)
             neptune_logger.log(f"evaluation/{dataset_name}/percent_correct_clustering",
                                track_metrics.percent_correct_clustering)
             neptune_logger.log(f"evaluation/{dataset_name}/average_track_accuracy",
@@ -172,19 +172,19 @@ def run_model(model: str, neptune_logger: NeptuneLogger, store_model: str, train
                                track_metrics.average_best_track_accuracy * 100)
             neptune_logger.log(f"evaluation/{dataset_name}/average_best_bbox_accuracy",
                                track_metrics.average_best_bbox_accuracy * 100)
-            # print("///////////////////////////////////////////////////////////////////////////")
-            # print(f'{dataset_name} metrics:')
-            # print("\n")
+            print("///////////////////////////////////////////////////////////////////////////")
+            print(f'{dataset_name} metrics:')
+            print("\n")
             # for metrics in track_metrics.video_metrics:
-            #     print(metrics)
-            #     print("\n")
-            # print("///////////////////////////////////////////////////////////////////////////")
-            # print(f"///// Evaluation Clustering on {dataset_name}")
-            # print(f"% of videos with correct clustering found: {track_metrics.percent_correct_clustering:.2f}%")
-            # print(f"Average Track role_id Accuracy {track_metrics.average_track_accuracy * 100:.2f}")
-            # print(f"Average Bbox role_id Accuracy {track_metrics.average_bbox_accuracy * 100:.2f}")
-            # print(f"True Clustering Track role_id Accuracy {track_metrics.average_best_track_accuracy * 100:.2f}")
-            # print(f"True Clustering Average Bbox role_id Accuracy {track_metrics.average_best_bbox_accuracy * 100:.2f}")
+                # print(metrics)
+                # print("\n")
+            print("///////////////////////////////////////////////////////////////////////////")
+            print(f"///// Evaluation Clustering on {dataset_name}")
+            print(f"% of videos with correct clustering found: {track_metrics.percent_correct_clustering:.2f}%")
+            print(f"Average Track role_id Accuracy {track_metrics.average_track_accuracy * 100:.2f}")
+            print(f"Average Bbox role_id Accuracy {track_metrics.average_bbox_accuracy * 100:.2f}")
+            print(f"True Clustering Track role_id Accuracy {track_metrics.average_best_track_accuracy * 100:.2f}")
+            print(f"True Clustering Average Bbox role_id Accuracy {track_metrics.average_best_bbox_accuracy * 100:.2f}")
 
     # Save model
     if store_model is not None:

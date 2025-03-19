@@ -7,7 +7,8 @@ from typing import Any, Union
 from pathlib import Path
 from tabulate import tabulate  # type: ignore
 from tracklab.core import Evaluator as EvaluatorBase  # type: ignore
-from gsr.utils.neptune_logger import NeptuneLogger
+import sys
+from gsr.modules.utils.neptune_logger import NeptuneLogger
 
 from omegaconf import DictConfig  # type: ignore
 from tracklab.wrappers.datasets.soccernet.soccernet_game_state import SoccerNetGameState  # type: ignore
@@ -79,7 +80,7 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
         )
 
         if tracker_state.detections_gt is None or len(tracker_state.detections_gt) == 0:
-            self.log.warning(
+            log.warning(
                 f"Stopping evaluation because the current split ({self.eval_set}) has no ground truth detections."
             )
             return
@@ -131,7 +132,7 @@ class TrackEvalEvaluator(EvaluatorBase):  # type: ignore
                 metric = getattr(trackeval.metrics, metric_name)
                 metrics_list.append(metric(metrics_config))
             except AttributeError:
-                self.log.warning(
+                log.warning(
                     f"Skipping evaluation for unknown metric: {metric_name}"
                 )
 
